@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鉴微 INSIGHT · 王鑫垚实习项目</title>
+<meta name="description" content="鉴微 INSIGHT —— AI Copilot for Vulnerability Management. Grounded generation, traceable citations, human-in-the-loop.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z' fill='%23D97757'/%3E%3Cpath d='M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z' fill='%23FAF9F5'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #FAF9F5;
+    --bg-soft: #F0EEE6;
+    --ink: #1F1E1D;
+    --ink-soft: #3D3B37;
+    --muted: #6C6A64;
+    --faint: #8B877D;
+    --line: #E5E2D9;
+    --line-strong: #D6D2C6;
+    --brand: #D97757;
+    --brand-deep: #C15F3C;
+    --brand-tint: #FBF1EC;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "SimSun", serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    line-height: 1.65;
+  }
+
+  /* 暖色光晕 + 细网格 */
+  .orb { position: fixed; border-radius: 50%; filter: blur(110px); pointer-events: none; z-index: 0; }
+  .orb-a { width: 640px; height: 640px; top: -260px; left: -180px; background: rgba(217, 119, 87, .16); }
+  .orb-b { width: 560px; height: 560px; top: 14%; right: -220px; background: rgba(198, 169, 121, .18); }
+  .orb-c { width: 520px; height: 520px; bottom: -280px; left: 30%; background: rgba(193, 95, 60, .08); }
+  .grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .55;
+    background-image:
+      linear-gradient(rgba(31,30,29,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(31,30,29,.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 72% 55% at 50% 26%, #000 30%, transparent 76%);
+    -webkit-mask-image: radial-gradient(ellipse 72% 55% at 50% 26%, #000 30%, transparent 76%);
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  /* 顶部栏 */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 26px 0; font-size: 13px; color: var(--muted);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; letter-spacing: .2px; }
+  .brand svg { display: block; }
+  .brand em { font-style: normal; font-size: 11px; letter-spacing: .22em; color: var(--faint); font-weight: 500; }
+  .nav-meta { display: flex; align-items: center; gap: 18px; font-size: 12px; color: var(--faint); }
+  .nav-meta .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #4E9A6B; box-shadow: 0 0 0 3px rgba(78, 154, 107, .14); margin-right: 7px;
+  }
+
+  /* 通用英文小标签 */
+  .eyebrow-en {
+    font-size: 11px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  /* 主视觉 */
+  header.hero {
+    min-height: calc(100vh - 190px); padding: 56px 0 60px; text-align: center;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 7px 16px 7px 8px; border: 1px solid var(--line); border-radius: 999px;
+    background: rgba(255,255,255,.72); color: var(--muted); font-size: 11px; font-weight: 600;
+    letter-spacing: .18em; text-transform: uppercase;
+    box-shadow: 0 1px 2px rgba(31,30,29,.03);
+  }
+  .eyebrow .pip {
+    width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--brand); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0;
+  }
+  .author { margin-top: 30px; font-size: 15px; letter-spacing: 3px; color: var(--muted); font-weight: 500; }
+  h1 {
+    margin-top: 14px; font-family: var(--serif); font-size: clamp(40px, 7.2vw, 76px);
+    line-height: 1.14; font-weight: 500; letter-spacing: -1.2px; color: var(--ink);
+  }
+  h1 .en {
+    display: block; margin-top: 16px; font-family: "Inter", -apple-system, sans-serif;
+    font-size: clamp(11px, 1.4vw, 13.5px); font-weight: 600; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .lede {
+    margin: 26px auto 0; max-width: 640px; color: var(--muted); font-size: clamp(14px, 1.55vw, 15.5px); line-height: 1.95;
+  }
+  .lede b { color: var(--ink-soft); font-weight: 600; }
+  .lede .en { color: var(--brand-deep); font-weight: 600; }
+
+  /* 按钮 */
+  .actions { margin-top: 42px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    position: relative; display: inline-flex; align-items: center; gap: 11px;
+    height: 50px; padding: 0 26px 0 28px; border-radius: 10px; font-size: 14.5px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: 1px solid transparent;
+    transition: transform .18s ease, box-shadow .25s ease, background .2s ease, border-color .2s ease, color .2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn svg { transition: transform .2s ease; }
+  .btn .en { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .7; font-weight: 600; }
+  .btn-primary {
+    color: #fff; background: var(--brand);
+    box-shadow: 0 8px 22px -12px rgba(193, 95, 60, .9), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .btn-primary:hover { background: var(--brand-deep); transform: translateY(-2px); box-shadow: 0 14px 30px -14px rgba(193, 95, 60, 1); }
+  .btn-primary:hover svg { transform: translateX(3px); }
+  .btn-ghost {
+    color: var(--ink-soft); background: #fff; border-color: var(--line-strong);
+    box-shadow: 0 1px 2px rgba(31,30,29,.04);
+  }
+  .btn-ghost:hover { color: var(--brand-deep); border-color: var(--brand); transform: translateY(-2px); }
+
+  /* 能力标签 */
+  .chips { margin-top: 46px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .chip {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: 8px 15px; border-radius: 999px;
+    border: 1px solid var(--line); background: rgba(255,255,255,.7);
+  }
+  .chip i { font-style: normal; color: var(--brand); margin-right: 7px; }
+
+  footer {
+    margin-top: 40px; padding: 30px 0 40px; text-align: center;
+    border-top: 1px solid var(--line); color: var(--faint); font-size: 12.5px; line-height: 2;
+  }
+  footer .sep { margin: 0 8px; opacity: .5; }
+  footer .en { font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: #A8A399; }
+
+  /* 入场动画 */
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .hero > * { animation: rise .7s cubic-bezier(.22,.7,.3,1) both; }
+  .hero > *:nth-child(2) { animation-delay: .06s; }
+  .hero > *:nth-child(3) { animation-delay: .12s; }
+  .hero > *:nth-child(4) { animation-delay: .18s; }
+  .hero > *:nth-child(5) { animation-delay: .24s; }
+  .hero > *:nth-child(6) { animation-delay: .3s; }
+  @media (prefers-reduced-motion: reduce) {
+    .hero > * { animation: none; }
+    html { scroll-behavior: auto; }
+    .btn { transition: none; }
+  }
+
+  @media (max-width: 640px) {
+    nav { padding: 20px 0; }
+    .nav-meta .hide-sm { display: none; }
+    header.hero { min-height: calc(100vh - 150px); padding: 44px 0; }
+    .author { letter-spacing: 2px; font-size: 14px; }
+    h1 .en { letter-spacing: .22em; }
+    .actions { flex-direction: column; align-items: stretch; }
+    .btn { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="orb orb-c"></div>
+  <div class="grid"></div>
+
+  <div class="wrap">
+    <nav>
+      <div class="brand">
+        <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z" fill="#D97757"/>
+          <path d="M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z" fill="#FAF9F5"/>
+        </svg>
+        鉴微 <em>INSIGHT</em>
+      </div>
+      <div class="nav-meta">
+        <span class="hide-sm">AI PRODUCT · PORTFOLIO</span>
+        <span><span class="dot"></span>DEMO ONLINE</span>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <span class="eyebrow"><span class="pip">AI</span>AI Product Manager · Internship Portfolio</span>
+      <div class="author">王 鑫 垚 实 习 项 目</div>
+      <h1>
+        鉴微 AI 赋能助手
+        <span class="en">Insight · AI Copilot for Vulnerability Management</span>
+      </h1>
+      <p class="lede">
+        面向漏洞管理平台的 AI 助手。<b>Grounded Generation</b>：事实与语言分离，大模型只负责组织语言；
+        每条结论 <b>Traceable</b>，缺失数据明确标注「无法判断」。
+      </p>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="/insight-replica.html">
+          进入网页 <span class="en">Launch Demo</span>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a class="btn btn-ghost" href="/docs.html">
+          查看详情 <span class="en">View Docs</span>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+
+      <div class="chips">
+        <span class="chip"><i>◆</i>Anti-Hallucination</span>
+        <span class="chip"><i>◆</i>Traceable Citations</span>
+        <span class="chip"><i>◆</i>3-Tier Fallback</span>
+        <span class="chip"><i>◆</i>Human-in-the-Loop</span>
+      </div>
+    </header>
+  </div>
+
+  <footer class="wrap">
+    © 2026 王鑫垚 · AI 产品经理实习作品集
+    <span class="sep">|</span>
+    演示数据仅用于功能展示
+    <br>
+    <span class="en">Built for demonstration · Grounded · Traceable · Explainable</span>
+  </footer>
+</body>
+</html>

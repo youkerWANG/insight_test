@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鉴微 INSIGHT · 技术架构文档</title>
+<meta name="description" content="鉴微 INSIGHT AI Agent 方向结构文档：事实与语言分离、结论可溯源、三层降级、人机协同。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z' fill='%23D97757'/%3E%3Cpath d='M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z' fill='%23FAF9F5'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #FAF9F5;
+    --bg-soft: #F0EEE6;
+    --ink: #1F1E1D;
+    --ink-soft: #3D3B37;
+    --muted: #6C6A64;
+    --faint: #8B877D;
+    --line: #E5E2D9;
+    --line-strong: #D6D2C6;
+    --brand: #D97757;
+    --brand-deep: #C15F3C;
+    --brand-tint: #FBF1EC;
+    --code-bg: #F3F1E9;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "SimSun", serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink); line-height: 1.9;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .orb { position: fixed; border-radius: 50%; filter: blur(120px); pointer-events: none; z-index: 0; }
+  .orb-a { width: 620px; height: 620px; top: -280px; left: -180px; background: rgba(217, 119, 87, .13); }
+  .orb-b { width: 540px; height: 540px; top: 34%; right: -250px; background: rgba(198, 169, 121, .16); }
+  .grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .4;
+    background-image: linear-gradient(rgba(31,30,29,.04) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(31,30,29,.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 50% at 38% 0%, #000 18%, transparent 74%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 50% at 38% 0%, #000 18%, transparent 74%);
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 2px; width: 0;
+    background: var(--brand); z-index: 50; transition: width .1s linear; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 40; backdrop-filter: blur(14px);
+    background: rgba(250, 249, 245, .86); border-bottom: 1px solid var(--line);
+  }
+  .topbar-in { max-width: 1220px; margin: 0 auto; padding: 0 28px; height: 58px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; }
+  .brand em { font-style: normal; font-size: 10.5px; letter-spacing: .22em; color: var(--faint); font-weight: 600; }
+  .tbtns { display: flex; align-items: center; gap: 12px; }
+  .tbtn { color: var(--muted); text-decoration: none; font-size: 13px; padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; transition: .2s; }
+  .tbtn:hover { color: var(--ink); border-color: var(--line-strong); }
+  .tbtn.primary { color: #fff; border-color: transparent; background: var(--brand); font-weight: 600; }
+  .tbtn.primary:hover { background: var(--brand-deep); color: #fff; transform: translateY(-1px); }
+
+  .layout { position: relative; z-index: 1; max-width: 1220px; margin: 0 auto; padding: 44px 28px 80px;
+    display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 52px; }
+
+  /* 侧边目录 */
+  aside { position: sticky; top: 86px; align-self: start; max-height: calc(100vh - 120px); overflow-y: auto; }
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 2px; }
+  .toc-label { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: #A8A399; font-weight: 700; margin-bottom: 14px; }
+  .toc a { display: block; color: var(--muted); text-decoration: none; font-size: 13px; padding: 6px 10px;
+    border-left: 2px solid transparent; border-radius: 0 6px 6px 0; transition: .18s; }
+  .toc a:hover { color: var(--ink); background: var(--bg-soft); }
+  .toc a.lv3 { padding-left: 24px; font-size: 12.5px; color: var(--faint); }
+  .toc a.on { color: var(--brand-deep); border-left-color: var(--brand); background: var(--brand-tint); }
+
+  /* 正文 */
+  article { min-width: 0; }
+  .doc-head { margin-bottom: 34px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+  .doc-kicker { font-size: 10.5px; font-weight: 700; letter-spacing: .26em; text-transform: uppercase; color: var(--brand-deep); }
+  article h1 { font-family: var(--serif); font-size: clamp(28px, 3.6vw, 38px); line-height: 1.32;
+    letter-spacing: -.6px; margin: 10px 0 0; font-weight: 500; color: var(--ink); }
+  article h2 { position: relative; font-family: var(--serif); font-size: 23px; font-weight: 600;
+    margin: 48px 0 16px; padding-top: 6px; letter-spacing: -.2px; scroll-margin-top: 80px; color: var(--ink); }
+  article h2::before { content: ""; position: absolute; left: 0; top: -12px; width: 34px; height: 2px;
+    background: var(--brand); border-radius: 2px; }
+  article h3 { font-size: 16px; font-weight: 650; margin: 30px 0 10px; color: var(--ink-soft); scroll-margin-top: 80px; }
+  article h4 { font-size: 14.5px; margin: 22px 0 8px; color: var(--ink-soft); }
+  .anchor { opacity: 0; margin-left: 8px; color: #BDB7AA; text-decoration: none; font-weight: 400; transition: .15s; }
+  h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+  article p { margin: 12px 0; color: var(--ink-soft); font-size: 14.5px; }
+  article strong { color: var(--ink); font-weight: 650; }
+  article a { color: var(--brand-deep); text-decoration: none; border-bottom: 1px solid rgba(193, 95, 60, .35); }
+  article a:hover { border-bottom-color: var(--brand-deep); }
+  article ul, article ol { margin: 12px 0 12px 4px; padding-left: 22px; color: var(--ink-soft); font-size: 14.5px; }
+  article li { margin: 6px 0; }
+  article li::marker { color: #B5AFA1; }
+  article hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  blockquote {
+    margin: 20px 0; padding: 14px 18px; border-left: 2px solid var(--brand);
+    background: var(--brand-tint); border-radius: 0 10px 10px 0; color: var(--muted); font-size: 13.5px;
+  }
+  article code {
+    font-family: var(--mono); font-size: 12.5px; background: var(--bg-soft);
+    border: 1px solid var(--line); padding: 1.5px 6px; border-radius: 5px;
+    color: #8A4B32; white-space: nowrap;
+  }
+  article pre {
+    margin: 16px 0; padding: 16px 18px; background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 12px; overflow-x: auto; line-height: 1.7;
+  }
+  article pre code {
+    background: none; border: none; padding: 0; color: #34322E; font-size: 12.5px; white-space: pre;
+  }
+  .tw { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  thead th {
+    text-align: left; padding: 11px 14px; background: var(--bg-soft); color: var(--ink-soft);
+    font-weight: 650; font-size: 12.5px; letter-spacing: .02em; white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody td { padding: 10px 14px; color: #4A4740; border-bottom: 1px solid #EFECE3; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #FBFAF6; }
+  tbody td code { white-space: nowrap; }
+
+  footer.doc-foot { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line);
+    color: var(--faint); font-size: 12.5px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  @media (max-width: 940px) {
+    .layout { grid-template-columns: 1fr; gap: 0; padding-top: 30px; }
+    aside { display: none; }
+    article h2 { font-size: 21px; }
+  }
+  @media (max-width: 640px) {
+    .topbar-in { padding: 0 16px; }
+    .layout { padding: 24px 16px 60px; }
+    .tbtn { padding: 7px 11px; font-size: 12.5px; }
+    article pre { padding: 13px 12px; }
+    table { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="orb orb-a"></div><div class="orb orb-b"></div><div class="grid"></div>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="/">
+      <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z" fill="#D97757"/>
+        <path d="M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z" fill="#FAF9F5"/>
+      </svg>
+      鉴微 <em>INSIGHT · DOCS</em>
+    </a>
+    <div class="tbtns">
+      <a class="tbtn" href="/">返回封面</a>
+      <a class="tbtn primary" href="/insight-replica.html">进入演示</a>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <aside>
+    <div class="toc-label">Contents</div>
+    <nav class="toc">
+    <a class="lv2" href="#s2">一、项目总体架构</a>
+    <a class="lv2" href="#s3">二、AI Agent 核心设计思想</a>
+    <a class="lv3" href="#s4">2.1 事实与语言分离（防幻觉架构）</a>
+    <a class="lv3" href="#s5">2.2 结论可溯源（Citations 机制）</a>
+    <a class="lv3" href="#s6">2.3 AgentBridge：前端 Agent 动作总线（insight-replica.html:533-596）</a>
+    <a class="lv3" href="#s7">2.4 LUI 任务拆解可视化（Agent 执行过程的透明化）</a>
+    <a class="lv2" href="#s8">三、Agent 契约接口（/agent-api/*）</a>
+    <a class="lv3" href="#s9">3.1 功能一：漏洞研判摘要 `POST /agent-api/judgement`（读取类）</a>
+    <a class="lv3" href="#s10">3.2 功能三：修复建议本地化 `POST /agent-api/fix-advice`（读取类）</a>
+    <a class="lv3" href="#s11">3.3 功能三（状态变更）：采纳并建工单 `POST /agent-api/fix-advice/adopt`</a>
+    <a class="lv3" href="#s12">3.4 通用：由漏洞建工单 `POST /agent-api/tickets`</a>
+    <a class="lv2" href="#s13">四、平台数据层（Agent 的事实源）</a>
+    <a class="lv3" href="#s14">4.1 数据集合（REST：/api/&lt;collection&gt;，支持 ?q= 全文检索）</a>
+    <a class="lv3" href="#s15">4.2 漏洞对象关键字段（Agent 取数用）</a>
+    <a class="lv3" href="#s16">4.3 CRUD 完整可用（已实测）</a>
+    <a class="lv2" href="#s17">五、前端 AI 功能落点（insight-replica.html，~2600 行单文件）</a>
+    <a class="lv2" href="#s18">六、运行与验证记录（2026-11-06 实测全部通过）</a>
+    <a class="lv2" href="#s19">七、AI Agent 能力总结与演进方向</a>
+    <a class="lv3" href="#s20">7.1 当前已具备的 Agent 特征</a>
+    <a class="lv3" href="#s21">7.2 与&quot;标准 AI Agent&quot;的差距（当前形态 = 确定性工作流 Agent）</a>
+    <a class="lv3" href="#s22">7.3 建议演进路线（按优先级）</a>
+    <a class="lv2" href="#s23">八、文件清单</a>
+    <a class="lv2" href="#s24">九、线上部署与在线大模型配置</a>
+    <a class="lv3" href="#s25">9.1 部署形态（Vercel 同源）</a>
+    <a class="lv3" href="#s26">9.2 大模型在线配置（面向非技术使用者）</a>
+    <a class="lv3" href="#s27">9.3 鉴权与可观测</a>
+    </nav>
+  </aside>
+  <article>
+    <div class="doc-head">
+      <div class="doc-kicker">Technical Architecture</div>
+    </div>
+<h1 id="top">鉴微 INSIGHT · AI Agent 方向结构文档</h1>
+<blockquote>基于项目实测（backend.py / insight-replica.html / data.json）梳理，所有接口均已在 2026-11-06 实际运行验证。<br>项目定位：<strong>漏洞管理平台的 AI 助手</strong> —— LLM 只负责"组织语言"，事实全部来自平台结构化数据，每条结论可溯源，缺失数据明确标注"无法判断"。</blockquote>
+<hr>
+<h2 id="s2"><a class="anchor" href="#s2">#</a>一、项目总体架构</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    insight-replica.html（前端，单文件）        │
+│   AgentBridge（Agent 接入层）  ├─ local 模式：LocalActions     │
+│                              └─ remote 模式：fetch /agent-api│
+└───────────────┬─────────────────────────────────────────────┘
+                │ HTTP（同源托管，无 CORS）
+┌───────────────▼─────────────────────────────────────────────┐
+│                    backend.py（纯标准库后端）                  │
+│  ① 静态托管前端      ② 平台数据 CRUD（/api/*，读写 data.json） │
+│  ③ Agent 契约接口（/agent-api/*）                              │
+│  ④ DeepSeek 调用（OpenAI 兼容协议，纯 urllib）                  │
+└───────────────┬─────────────────────────────────────────────┘
+                │ HTTPS / chat/completions
+┌───────────────▼─────────────────────────────────────────────┐
+│         DeepSeek LLM（deepseek-flash，thinking=disabled）     │
+│         失败自动降级为后端内置模板生成（generatedBy 标注来源）    │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>三层降级设计</strong>（响应中 <code>generatedBy</code> 字段标明来源，前端据此显示"生成方式"）：</p>
+<div class="tw"><table><thead><tr><th>级别</th><th>来源</th><th>触发条件</th></tr></thead><tbody><tr><td>1</td><td><code>deepseek</code>（真实 LLM 分析）</td><td>配置了 API Key 且调用成功</td></tr><tr><td>2</td><td><code>template</code>（后端内置模板）</td><td>LLM 未配置 / 调用失败 / 返回空正文</td></tr><tr><td>3</td><td>前端 <code>LocalActions</code>（本地模拟）</td><td>前端为 <code>local</code> 模式（未接远程后端）</td></tr></tbody></table></div>
+<hr>
+<h2 id="s3"><a class="anchor" href="#s3">#</a>二、AI Agent 核心设计思想</h2>
+<h3 id="s4"><a class="anchor" href="#s4">#</a>2.1 事实与语言分离（防幻觉架构）</h3>
+<p>LLM 不接触任何"自由发挥"空间：</p>
+<pre><code>平台事实采集（确定性代码）──→ facts JSON ──→ LLM（仅组织语言）──→ 摘要/步骤
+     ↑                                                          │
+     └────── knowledge / intel / assets / software / tickets ────┘</code></pre>
+<ul><li><strong>System Prompt 约束</strong>（backend.py:362-383）：</li><li>功能一："只允许使用【平台事实】中的信息组织语言，不得新增技术结论；事实缺失必须写"平台未采集，无法判断""</li><li>功能三："只允许使用平台事实中的信息（资产清单、版本情况、责任人、官方修复建议），不得编造版本号或资产"</li><li><strong>temperature=0.2</strong>，thinking=disabled（reasoning_tokens=0，省费用且正文稳定）</li><li><strong>max_tokens 上限</strong>：摘要 420 / 步骤 560</li></ul>
+<h3 id="s5"><a class="anchor" href="#s5">#</a>2.2 结论可溯源（Citations 机制）</h3>
+<p>每次 AI 输出都附带 <code>citations</code>（依据清单）与 <code>unknowns</code>（缺失清单）：</p>
+<div class="tw"><table><thead><tr><th>citations 条目</th><th>数据来源</th></tr></thead><tbody><tr><td>VPT 归因</td><td>配置中心 VPT 规则（评分公式透明可配置）</td></tr><tr><td>情报信息</td><td>漏洞详情四字段：EXP / POC / 补丁 / 在野利用</td></tr><tr><td>资产档案</td><td>资产台账（资产 IP、责任人、风险等级）</td></tr><tr><td>知识库命中</td><td>漏洞知识库（同 CVE / 同名条目）</td></tr><tr><td>同源处置</td><td>同 CVE 已修复记录（处置历史参考）</td></tr></tbody></table></div>
+<p>置信度规则：资产已纳管 → <code>high/较高</code>；未纳管 → <code>mid/中（资产未纳管，版本信息缺失）</code>。</p>
+<h3 id="s6"><a class="anchor" href="#s6">#</a>2.3 AgentBridge：前端 Agent 动作总线（insight-replica.html:533-596）</h3>
+<p>统一入口 <code>window.InsightAgentAPI.call(action, payload)</code>，三级路由：</p>
+<pre><code>call(action) ─┬─ remote 模式且有映射 → POST /agent-api/&lt;route&gt;   （真实后端）
+              ├─ register() 注册的 handler → 自定义接管           （扩展点）
+              └─ 兜底 → window.LocalActions[action]()            （本地模拟）</code></pre>
+<ul><li>模式持久化：<code>localStorage['insight-agent-mode']</code>，演示时切换一次即可</li><li>事件总线：<code>on('before:action' / 'after:action' / '*')</code>，可插桩监控</li></ul>
+<h3 id="s7"><a class="anchor" href="#s7">#</a>2.4 LUI 任务拆解可视化（Agent 执行过程的透明化）</h3>
+<p>前端把 Agent 的执行链具象为"步骤逐条点亮"（真实调用工具，非纯动画）：</p>
+<pre><code>功能一 JUDGE_STEPS                      功能三 FIX_STEPS
+──────────────────────                  ──────────────────────
+1. getVuln            读取漏洞上下文      1. getVuln           读取漏洞上下文
+2. getVptAttribution  计算 VPT 归因      2. getVptAttribution 计算 VPT 归因
+3. searchKnowledge    检索知识库/情报库   3. searchKnowledge   检索知识库与处置记录
+4. getDisposalRecords 处置记录时间线      4. getAssetProfile   拉取资产档案与责任人
+5. organize           组织语言(溯源)     5. organize          组织语言(逐条溯源)</code></pre>
+<p>每步实时显示执行结果（如"100 分（P0）· 特殊规则未命中"、"命中 2 条"、"未纳管"）。</p>
+<p><strong>人工在环（Human-in-the-loop）</strong>：AI 输出仅供参考 → 人工核对 → 点"采纳"才真正建工单 → 写审计日志。UI 明确标注："AI 生成内容仅供参考，采纳前请人工核对。"</p>
+<hr>
+<h2 id="s8"><a class="anchor" href="#s8">#</a>三、Agent 契约接口（/agent-api/*）</h2>
+<p>统一响应契约：<code>{ ok: bool, data: {...} }</code>，出错返回 <code>{ ok: false, error: "..." }</code>。</p>
+<h3 id="s9"><a class="anchor" href="#s9">#</a>3.1 功能一：漏洞研判摘要 <code>POST /agent-api/judgement</code>（读取类）</h3>
+<p><strong>请求</strong>：<code>{"kind": "ip" | "web", "id": 240}</code></p>
+<p><strong>响应 data 结构</strong>（实测值）：</p>
+<pre><code>{
+  &quot;vuln&quot;: {&quot;id&quot;,&quot;name&quot;,&quot;level&quot;,&quot;vpt&quot;,&quot;type&quot;,&quot;cve&quot;,&quot;asset&quot;,&quot;status&quot;},
+  &quot;attribution&quot;: {&quot;score&quot;: 100.0, &quot;key&quot;: &quot;P0&quot;, &quot;byRule&quot;: false},
+  &quot;summary&quot;: &quot;【研判摘要】...(≤150字，由 DeepSeek 生成)&quot;,
+  &quot;citations&quot;: [{&quot;label&quot;,&quot;from&quot;,&quot;detail&quot;}, ...],      // 2~5 项
+  &quot;unknowns&quot;: [&quot;平台未采集，无法判断...&quot;, ...],
+  &quot;confidence&quot;: {&quot;level&quot;: &quot;high&quot;, &quot;text&quot;: &quot;较高&quot;},
+  &quot;generatedBy&quot;: &quot;deepseek&quot; | &quot;template&quot;
+}</code></pre>
+<ol><li><code>_get_vuln</code> 取漏洞 → <code>_facts</code> 收集：VPT 计算 + 资产 + 软件 + 知识库 + 情报 + 同 CVE 已修复记录</li><li>组装 <code>facts</code> JSON → <code>llm_judgement_summary</code> 调 DeepSeek（失败 → <code>_template_judgement</code> 降级）</li><li>返回摘要 + 引用 + 缺失 + 置信度</li></ol>
+<p>执行链（backend.py <code>handle_judgement</code>，408-458 行）：</p>
+<p><strong>VPT 评分算法</strong>（<code>calc_vpt</code>，287-320 行，与前端同口径）：</p>
+<pre><code>总分 = 资产维度×权重% + 漏洞维度×权重% + 情报维度×权重%
+漏洞维度 = 等级分(超危100/高危80/中危50/低危10/信息0) × 权重
+P 级映射：&gt;80→P0，&gt;74→P1，&gt;49→P2，&gt;0→P3，else P4
+特殊规则优先：如&quot;外网资产+高危→81&quot;直接赋值（byRule=true）
+当前配置：资产 0% / 漏洞 100% / 情报 0%（演示配置）</code></pre>
+<h3 id="s10"><a class="anchor" href="#s10">#</a>3.2 功能三：修复建议本地化 <code>POST /agent-api/fix-advice</code>（读取类）</h3>
+<p><strong>请求</strong>：<code>{"kind":"web","id":311}</code></p>
+<p><strong>响应 data 结构</strong>（实测）：</p>
+<pre><code>{
+  &quot;vuln&quot;: {&quot;name&quot;,&quot;level&quot;,&quot;vpt&quot;,&quot;type&quot;,&quot;cve&quot;,&quot;asset&quot;,&quot;source&quot;},
+  &quot;assets&quot;: [{&quot;ip&quot;,&quot;name&quot;,&quot;org&quot;,&quot;owner&quot;,&quot;biz&quot;,&quot;from&quot;}],   // 逐条标注 from 溯源
+  &quot;managed&quot;: false, &quot;versionKnown&quot;: false, &quot;versionText&quot;: &quot;...&quot;,
+  &quot;kbFound&quot;: false, &quot;kbText&quot;: &quot;...&quot;,
+  &quot;sameClosed&quot;: [...],
+  &quot;officialFix&quot;: &quot;官方修复建议原文&quot;,
+  &quot;coord&quot;: {&quot;owner&quot;,&quot;coOwner&quot;,&quot;biz&quot;,&quot;assetOwner&quot;},        // 协同处置人信息
+  &quot;steps&quot;: [&quot;修复步骤1&quot;, &quot;...&quot;],                          // 3~5条，DeepSeek 生成
+  &quot;confidence&quot;: &quot;中（该资产未纳管...）&quot;, &quot;confLevel&quot;: &quot;mid&quot;,
+  &quot;unknowns&quot;: [&quot;平台资产台账中未收录...无法判断...&quot;],
+  &quot;generatedBy&quot;: &quot;deepseek&quot;
+}</code></pre>
+<p>实测 DeepSeek 输出严格遵循约束——版本缺失时输出"具体版本号需先确认，无法判断"，未编造任何版本号。</p>
+<h3 id="s11"><a class="anchor" href="#s11">#</a>3.3 功能三（状态变更）：采纳并建工单 <code>POST /agent-api/fix-advice/adopt</code></h3>
+<p><strong>请求</strong>：<code>{"kind":"web","id":311}</code> → <strong>响应</strong>：<code>{"ok":true,"data":{"ticketId":"T-20261106-7898"}}</code></p>
+<p>执行链：生成工单号 <code>T-YYYYMMDD-xxxx</code> → 写入 tickets → 写审计日志（操作类型"修复建议助手"）。</p>
+<h3 id="s12"><a class="anchor" href="#s12">#</a>3.4 通用：由漏洞建工单 <code>POST /agent-api/tickets</code></h3>
+<p><strong>请求</strong>：<code>{"vulnId":240,"kind":"ip","from":"detail"}</code> → <strong>响应</strong>：<code>{"ok":true,"data":{"ticketId":"T-20261106-7253"}}</code></p>
+<p><code>kind</code> 可省（自动在 ip/web 两个集合中查找）；<code>from</code> 决定审计日志的操作来源标注。</p>
+<hr>
+<h2 id="s13"><a class="anchor" href="#s13">#</a>四、平台数据层（Agent 的事实源）</h2>
+<p>存储：<code>data.json</code>（零依赖，首次启动自动写入种子数据），线程锁保护读写。</p>
+<h3 id="s14"><a class="anchor" href="#s14">#</a>4.1 数据集合（REST：/api/&lt;collection&gt;，支持 ?q= 全文检索）</h3>
+<div class="tw"><table><thead><tr><th>集合</th><th>键</th><th>结构</th><th>说明</th></tr></thead><tbody><tr><td>vulns-ip</td><td>vulns.ip</td><td>dict 数组（id/name/cve/...30+ 字段）</td><td>主机漏洞</td></tr><tr><td>vulns-web</td><td>vulns.web</td><td>同上</td><td>Web 漏洞</td></tr><tr><td>assets</td><td>assets</td><td><code>[IP, 名称, 组织, 来源, ?, 域, 风险, 责任人]</code></td><td>资产台账</td></tr><tr><td>software</td><td>software</td><td><code>[软件名, 版本, 主机名, IP, ...]</code></td><td>软件台账（版本溯源）</td></tr><tr><td>knowledge</td><td>knowledge</td><td><code>[名称, 等级, 类型, CVE, 发布日期]</code></td><td>漏洞知识库</td></tr><tr><td>intel</td><td>intel</td><td><code>[名称, 等级, CVE, ...]</code></td><td>情报库</td></tr><tr><td>tickets</td><td>tickets</td><td><code>{ticketId, vulnId, kind, ..., status}</code></td><td>工单</td></tr><tr><td>logs</td><td>logs</td><td><code>[时间, 用户, 角色, IP, 描述, 结果]</code></td><td>审计日志</td></tr><tr><td>vptconfig</td><td>vptConfig</td><td>嵌套权重配置</td><td>只读（PUT 可更新）</td></tr></tbody></table></div>
+<h3 id="s15"><a class="anchor" href="#s15">#</a>4.2 漏洞对象关键字段（Agent 取数用）</h3>
+<pre><code>事实八项：name / level / vpt / type / cve / asset / status / owner(+coOwner/biz)
+情报四项：exp / poc / patch / wild          ← 全空时触发&quot;评分依据需核实&quot;判定
+处置三文：desc（描述）/ danger（危害）/ fix（官方修复）← 240 等 5 条演示漏洞定制</code></pre>
+<h3 id="s16"><a class="anchor" href="#s16">#</a>4.3 CRUD 完整可用（已实测）</h3>
+<pre><code>GET    /api/&lt;c&gt;            列表（支持 ?q= 过滤）
+GET    /api/&lt;c&gt;/&lt;id&gt;       单条
+POST   /api/&lt;c&gt;            新建（漏洞自动建 ID / 工单自动补默认字段）
+PUT    /api/&lt;c&gt;/&lt;id&gt;       整条更新（漏洞白名单 VULN_EDITABLE 26 字段）
+PATCH  /api/&lt;c&gt;/&lt;id&gt;       局部更新（同 PUT）
+DELETE /api/&lt;c&gt;/&lt;id&gt;       删除
+GET    /api/health         健康检查（返回 LLM 状态）</code></pre>
+<p>所有写操作自动落审计日志（时间/用户/角色/IP/描述/结果）。</p>
+<hr>
+<h2 id="s17"><a class="anchor" href="#s17">#</a>五、前端 AI 功能落点（insight-replica.html，~2600 行单文件）</h2>
+<div class="tw"><table><thead><tr><th>区块</th><th>位置</th><th>说明</th></tr></thead><tbody><tr><td>注释/目录头</td><td>1-524</td><td>CSS（约 520 行，Ant Design 风格色板）</td></tr><tr><td><strong>AgentBridge 调用层</strong></td><td>530-596</td><td>动作总线 + 远程路由 + 模式持久化 + 事件</td></tr><tr><td>常量与 VPT 规则</td><td>598-725</td><td>LEVELS / VPT_RANGE / calcVptScore（与后端同口径）</td></tr><tr><td>DB 内存数据 &amp; LocalActions</td><td>727-1088</td><td>本地模拟数据 + 各动作实现（generateJudgement 1043 行含完整 citations 逻辑）</td></tr><tr><td>路由/菜单</td><td>1146-1310</td><td>8 个页面模块</td></tr><tr><td>仪表盘</td><td>1434+</td><td><strong>AI 漏洞研判面板</strong>：扫描评分异常（高分×情报缺失），列出"待关注的评分异常 21 条"</td></tr><tr><td>漏洞详情页</td><td>1698-1938</td><td>首张卡片即 AI 研判卡（JUDGE_STEPS 自动执行）</td></tr><tr><td><strong>修复建议助手抽屉</strong></td><td>1939-2118</td><td>FIX_STEPS + 结果渲染 + 采纳/复制/重生成</td></tr><tr><td>工单中心</td><td>2119+</td><td>remote 模式直连 /api/tickets 完整 CRUD</td></tr></tbody></table></div>
+<p>关键 UX 约定：citations 可点击弹出溯源 toast；unknowns 用"无法判断"高亮条；<code>生成方式</code> attends 实时显示 DeepSeek 真实分析 / 模板降级 / 本地模拟。</p>
+<hr>
+<h2 id="s18"><a class="anchor" href="#s18">#</a>六、运行与验证记录（2026-11-06 实测全部通过）</h2>
+<pre><code>启动：python backend.py      →  http://127.0.0.1:8000/insight-replica.html
+依赖：零第三方库（Python 3.15.2 标准库）</code></pre>
+<div class="tw"><table><thead><tr><th>#</th><th>测试项</th><th>结果</th></tr></thead><tbody><tr><td>1</td><td>GET /api/health</td><td>✅ <code>{"ok":true,"data":{"llm":"deepseek"}}</code></td></tr><tr><td>2</td><td>前端页面托管（HTTP 200，182 KB）</td><td>✅</td></tr><tr><td>3</td><td>CRUD 全流程（GET/POST/PUT/PATCH/DELETE + ?q= 过滤）</td><td>✅</td></tr><tr><td>4</td><td>/agent-api/judgement（ip:240 Log4j2）</td><td>✅ generatedBy=deepseek，VPT 100 分 P0，4 项依据</td></tr><tr><td>5</td><td>/agent-api/fix-advice（web:311 反序列化）</td><td>✅ 5 条本地化步骤，正确标注"无法判断"，无编造</td></tr><tr><td>6</td><td>/agent-api/tickets + /fix-advice/adopt</td><td>✅ 建单 T-20261106-7253 / -7898，审计日志同步</td></tr><tr><td>7</td><td>边界：不存在的漏洞 ID</td><td>✅ <code>{"ok":false,"error":"漏洞不存在"}</code>（404 语义 in-band）</td></tr><tr><td>8</td><td>浏览器实测前端渲染（截图验证）</td><td>✅ 仪表盘/资产/漏洞/AI 研判面板数据全部来自后端</td></tr></tbody></table></div>
+<hr>
+<h2 id="s19"><a class="anchor" href="#s19">#</a>七、AI Agent 能力总结与演进方向</h2>
+<h3 id="s20"><a class="anchor" href="#s20">#</a>7.1 当前已具备的 Agent 特征</h3>
+<div class="tw"><table><thead><tr><th>能力</th><th>实现方式</th><th>成熟度</th></tr></thead><tbody><tr><td>工具调用（Tool Use）</td><td>AgentBridge 动作 → 后端路由 / 本地工具函数</td><td>★★★☆☆（固定管线，非自主决策）</td></tr><tr><td>事实约束生成（ grounded generation）</td><td>facts JSON + 强 System Prompt</td><td>★★★★★（防幻觉设计完整）</td></tr><tr><td>溯源与引用（Citations）</td><td>citations + unknowns + from 字段逐条标注</td><td>★★★★★</td></tr><tr><td>置信度表达</td><td>资产纳管/版本可知 → high/mid</td><td>★★★★☆</td></tr><tr><td>人机协同（HITL）</td><td>AI 建议 → 人工采纳 → 写工单+审计</td><td>★★★★★</td></tr><tr><td>降级与可观测</td><td>三层降级 + generatedBy 标注 + 审计日志</td><td>★★★★★</td></tr><tr><td>LUI（对话式 UI）</td><td>抽屉 + 任务步骤点亮动画</td><td>★★★★☆（步骤真实执行）</td></tr></tbody></table></div>
+<h3 id="s21"><a class="anchor" href="#s21">#</a>7.2 与"标准 AI Agent"的差距（当前形态 = 确定性工作流 Agent）</h3>
+<ul><li><strong>无自主规划</strong>：步骤链（JUDGE_STEPS/FIX_STEPS）是写死的固定顺序，非 LLM 动态决策下一步调什么工具</li><li><strong>无记忆/多轮</strong>：每次调用独立，不保留会话上下文</li><li><strong>单 LLM、单任务</strong>：一次调用一个功能点，无复杂任务分解（如"把全部 P0 排个处置优先级"这类跨实体任务做不到）</li><li><strong>鉴权为演示级</strong>：读操作开放、写操作由环境变量 <code>ADMIN_TOKEN</code> 口令保护（请求头 <code>X-Admin-Token</code>），暂无用户体系与细粒度权限</li></ul>
+<h3 id="s22"><a class="anchor" href="#s22">#</a>7.3 建议演进路线（按优先级）</h3>
+<ol><li><strong>已完成</strong>：API Key 移出源码，改为「在线配置 &gt; 环境变量 &gt; 源码默认」三级优先；写操作由管理口令保护</li><li><strong>短期</strong>：接入正式鉴权（JWT + 操作白名单 + 角色体系），区分研究员 / 处置人 / 管理员</li><li><strong>中期</strong>：引入标准 Tool-Calling（OpenAI function calling）：把 _facts 拆分注册为独立 tools，由 LLM 决定调用顺序，从"固定管线"升级为"自主规划 Agent"</li><li><strong>中期</strong>：加会话记忆（工单处理上下文、用户偏好），支持多轮编排</li><li><strong>远期</strong>：跨实体长任务（批量研判、自动排期）、RAG 知识库检索、处置智能体与检测器联动闭环</li><li><strong>规范</strong>：data.json → SQLite/MySQL（现线程锁已在，切存储成本低）；补 pytest 自动化回归</li></ol>
+<hr>
+<h2 id="s23"><a class="anchor" href="#s23">#</a>八、文件清单</h2>
+<div class="tw"><table><thead><tr><th>文件</th><th>大小</th><th>角色</th></tr></thead><tbody><tr><td>backend.py</td><td>57 KB / 900 行</td><td>纯标准库后端：托管 + CRUD + Agent 契约 + 大模型调用</td></tr><tr><td>insight-replica.html</td><td>191 KB / ~2900 行</td><td>前端单文件：8 模块 SPA + AgentBridge + AI 双助手（研判/修复）+ 大模型配置页</td></tr><tr><td>data.json</td><td>90 KB</td><td>种子/运行数据：607 漏洞 + 134 资产 + 软件台/K/情报/工单/日志</td></tr><tr><td>AI-Agent-方向结构文档.md</td><td>本文档</td><td>结构梳理 + 实测记录</td></tr><tr><td>vercel-deploy/</td><td>—</td><td>线上部署包：封面页 + 同源前端 + Vercel 函数适配层</td></tr></tbody></table></div>
+<hr>
+<h2 id="s24"><a class="anchor" href="#s24">#</a>九、线上部署与在线大模型配置</h2>
+<h3 id="s25"><a class="anchor" href="#s25">#</a>9.1 部署形态（Vercel 同源）</h3>
+<pre><code>访客浏览器 ──HTTPS──▶ 自定义域名（Vercel）
+                          │
+    ┌─────────────────────┴──────────────────────┐
+    │ /                  → index.html（静态封面页）│
+    │ /insight-replica   → api/index.py（函数）   │
+    │ /api/*、/agent-api/* → 同一函数（WSGI 包装） │
+    └────────────────────────────────────────────┘</code></pre>
+<p><code>api/index.py</code> 是薄适配层：用 <code>_FakeTransport</code> 模拟 <code>BaseHTTPRequestHandler</code> 的 I/O，与 <code>backend.Handler</code> 动态组合，<strong>业务逻辑零改动</strong>即可运行在 Serverless 环境。</p>
+<div class="tw"><table><thead><tr><th>关注点</th><th>处理方式</th></tr></thead><tbody><tr><td>代码目录只读</td><td>运行时数据写入 <code>DATA_DIR</code>（Serverless 为 <code>/tmp</code>），冷启动自动重建种子数据</td></tr><tr><td>跨域</td><td>后端统一返回 <code>Access-Control-Allow-Origin</code>，并处理 <code>OPTIONS</code> 预检</td></tr><tr><td>缓存</td><td>HTML 响应 <code>Cache-Control: no-store</code>，前端迭代即时生效</td></tr><tr><td>密钥</td><td>仅存于平台环境变量，仓库零密钥</td></tr></tbody></table></div>
+<h3 id="s26"><a class="anchor" href="#s26">#</a>9.2 大模型在线配置（面向非技术使用者）</h3>
+<p>「配置中心 → 大模型配置」页允许分析师直接填写接入地址 / API Key / 模型名，无需接触代码：</p>
+<pre><code>生效优先级：本页保存的运行时配置  &gt;  环境变量（DEEPSEEK_API_KEY 等）  &gt;  源码默认值</code></pre>
+<ul><li><code>GET /api/llm-config</code>：返回脱敏配置（Key 仅显示尾号）与当前生效来源</li><li><code>PUT /api/llm-config</code>：保存配置，立即替换服务端默认值</li><li><code>POST /api/llm-config/test</code>：用页面输入发 16 tokens 最小请求，返回延迟与错误原因</li><li>「恢复服务端默认 Key」：清除运行时覆盖，回落到环境变量配置</li></ul>
+<h3 id="s27"><a class="anchor" href="#s27">#</a>9.3 鉴权与可观测</h3>
+<div class="tw"><table><thead><tr><th>能力</th><th>实现</th></tr></thead><tbody><tr><td>管理口令</td><td>环境变量 <code>ADMIN_TOKEN</code>，写操作与配置接口校验 <code>X-Admin-Token</code></td></tr><tr><td>开放读取</td><td>漏洞研判、修复建议等只读 AI 能力对访客开放，便于演示</td></tr><tr><td>审计日志</td><td>所有写操作记录时间 / 用户 / IP / 描述 / 结果</td></tr><tr><td>降级可观测</td><td>响应 <code>generatedBy</code> 标注真实模型 / 模板降级，前端实时显示生成方式</td></tr></tbody></table></div>
+    <footer class="doc-foot">
+      <span>© 2026 王鑫垚 · AI 产品经理实习作品集</span>
+      <span>Grounded · Traceable · Explainable</span>
+    </footer>
+  </article>
+</div>
+
+<script>
+(function () {
+  var bar = document.getElementById('progress');
+  var links = [].slice.call(document.querySelectorAll('.toc a'));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+    var idx = 0;
+    for (var i = 0; i < targets.length; i++) {
+      if (targets[i] && targets[i].getBoundingClientRect().top <= 110) idx = i;
+    }
+    links.forEach(function (a, i) { a.classList.toggle('on', i === idx); });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>
