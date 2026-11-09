@@ -1,0 +1,2767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鉴微 INSIGHT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z' fill='%231668dc'/%3E%3Cpath d='M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   全局基础
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: rgba(0,0,0,.88);
+  background: #f0f2f5;
+  overflow: hidden;
+}
+a { color: #1668dc; text-decoration: none; cursor: pointer; }
+a:hover { color: #4096ff; }
+ul { list-style: none; }
+button { font-family: inherit; }
+
+:root {
+  --primary: #1668dc;
+  --primary-hover: #4096ff;
+  --danger: #ff4d4f;
+  --text: rgba(0,0,0,.88);
+  --text-secondary: rgba(0,0,0,.45);
+  --border: #f0f0f0;
+  --sidebar-w: 180px;
+}
+
+/* ============================================================
+   布局骨架
+   ============================================================ */
+.layout { display: flex; height: 100vh; }
+.sidebar {
+  width: var(--sidebar-w);
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+  transition: width .2s;
+}
+.layout.collapsed .sidebar { width: 48px; }
+.layout.collapsed .logo .logo-text,
+.layout.collapsed .menu-item-title .mi-text, .layout.collapsed .menu-item-title .mi-arrow,
+.layout.collapsed .sidebar-footer .sf-user span { display: none; }
+.layout.collapsed .menu-item-title { padding: 0 16px; }
+.layout.collapsed .submenu .menu-item-title { padding-left: 16px; }
+.layout.collapsed .sidebar-footer { justify-content: center; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.content { flex: 1; overflow-y: auto; overflow-x: hidden; background: #f0f2f5; padding: 12px 16px 24px; position: relative; }
+
+/* ============================================================
+   侧边栏
+   ============================================================ */
+.logo {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.logo svg { flex-shrink: 0; }
+.logo-text { display: flex; align-items: center; min-width: 0; }
+.logo-main { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; line-height: 48px; }
+.logo-cn { font-size: 16px; font-weight: 700; color: #0b3b8c; letter-spacing: .5px; }
+.logo-ai { font-size: 13.5px; font-weight: 700; background: linear-gradient(90deg, #1668dc, #4096ff); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: .5px; }
+.beta-sup { font-style: normal; font-size: 9px; font-weight: 600; color: #d48806; letter-spacing: 1px; margin-left: 1px; position: relative; top: -8px; }
+
+.menu { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; }
+.menu::-webkit-scrollbar { width: 4px; }
+.menu::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 2px; }
+
+.menu-item { cursor: pointer; user-select: none; }
+.menu-item-title {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 16px;
+  gap: 8px;
+  color: rgba(0,0,0,.78);
+  font-size: 14px;
+  transition: background .2s, color .2s;
+}
+.menu-item-title .mi-icon { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: #1668dc; }
+.menu-item-title .mi-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-item-title .mi-arrow { width: 10px; height: 10px; transition: transform .25s; color: rgba(0,0,0,.35); flex-shrink: 0; }
+.menu-item.open > .menu-item-title .mi-arrow { transform: rotate(180deg); }
+.menu-item-title:hover { background: #f5f8ff; color: #1668dc; }
+.menu-item.active-root > .menu-item-title { background: #e8f1fd; color: #1668dc; }
+
+/* 侧边栏选中态（叶子节点）：蓝底白字 */
+.menu-leaf.active > .menu-item-title {
+  background: #1a6de0;
+  color: #fff;
+}
+.menu-leaf.active > .menu-item-title .mi-icon,
+.menu-leaf.active > .menu-item-title .mi-arrow { color: #fff; }
+.menu-leaf.active > .menu-item-title:hover { background: #1a6de0; color: #fff; }
+
+.submenu { display: none; background: #fff; }
+.menu-item.open > .submenu { display: block; }
+.submenu .menu-item-title { padding-left: 40px; font-size: 14px; }
+.submenu .submenu .menu-item-title { padding-left: 62px; }
+
+.sidebar-footer {
+  height: 44px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 14px;
+  flex-shrink: 0;
+}
+.sidebar-footer .sf-user { display: flex; align-items: center; gap: 6px; color: #1668dc; font-size: 13px; cursor: pointer; }
+.sidebar-footer .sf-user svg { color: #8c8c8c; flex-shrink: 0; }
+.sidebar-footer .sf-collapse { border: none; background: none; cursor: pointer; color: #bfbfbf; font-size: 12px; padding: 4px; }
+.sidebar-footer .sf-collapse:hover { color: #1668dc; }
+
+/* ============================================================
+   顶栏
+   ============================================================ */
+.topbar {
+  height: 40px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+.topbar .tb-left { display: flex; align-items: center; }
+.topbar .tb-right { display: flex; align-items: center; gap: 22px; color: #595959; }
+.topbar .tb-right .tb-btn { cursor: pointer; display: inline-flex; align-items: center; color: #8c8c8c; }
+.topbar .tb-right .tb-btn:hover { color: #1668dc; }
+.topbar .tb-user { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #595959; cursor: pointer; }
+.topbar .tb-user svg { color: #8c8c8c; }
+
+/* ============================================================
+   通用组件
+   ============================================================ */
+.card { background: #fff; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+.card-title { font-size: 15px; font-weight: 600; color: rgba(0,0,0,.88); margin-bottom: 12px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 28px; padding: 0 12px; border-radius: 4px;
+  border: 1px solid #d9d9d9; background: #fff; color: rgba(0,0,0,.78);
+  font-size: 13px; cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btn:hover { border-color: #1668dc; color: #1668dc; }
+.btn-primary { background: #1a6de0; border-color: #1a6de0; color: #fff; }
+.btn-primary:hover { background: #4096ff; border-color: #4096ff; color: #fff; }
+.btn-link { border: none; background: none; color: #1668dc; padding: 0 6px; height: 26px; }
+.btn-link:hover { color: #4096ff; }
+.btn-link-danger { border: none; background: none; color: #ff4d4f; padding: 0 6px; height: 26px; }
+.btn-link-danger:hover { color: #ff7875; }
+.btn:disabled { color: #bfbfbf; border-color: #d9d9d9; cursor: not-allowed; background: #fff; }
+
+.input, .select {
+  height: 28px; border: 1px solid #d9d9d9; border-radius: 4px;
+  padding: 0 8px; font-size: 13px; color: var(--text); background: #fff;
+  outline: none; transition: border-color .2s;
+}
+.input:focus, .select:focus { border-color: #1668dc; box-shadow: 0 0 0 2px rgba(22,104,220,.08); }
+.input::placeholder { color: #bfbfbf; }
+.input:disabled { background: #f5f5f5; color: #bfbfbf; cursor: not-allowed; }
+.select { padding-right: 24px; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 1024 1024'%3E%3Cpath fill='%23bfbfbf' d='M884 256h-75c-5 0-9 2-13 6L512 666 208 262c-4-4-8-6-13-6h-75c-6 0-11 7-7 13l366 528c9 13 26 13 35 0L891 269c4-6 0-13-7-13z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; }
+.select:disabled { background-color: #f5f5f5; color: #bfbfbf; cursor: not-allowed; }
+
+.filter-bar { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; padding: 4px 0 12px; }
+.filter-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(0,0,0,.66); white-space: nowrap; }
+.filter-item .input, .filter-item .select { width: 150px; }
+.filter-more { color: rgba(0,0,0,.75); font-weight: 700; cursor: pointer; letter-spacing: 1px; padding: 0 4px; }
+
+.tag { display: inline-block; padding: 1px 8px; border-radius: 3px; font-size: 12px; line-height: 20px; white-space: nowrap; }
+.tag-super  { background: #ffccc7; color: #ff4d4f; }
+.tag-high   { background: #ffe7ba; color: #fa8c16; }
+.tag-medium { background: #fff1b8; color: #d48806; }
+.tag-low    { background: #d6e4ff; color: #1d39c4; }
+.tag-info   { background: #b5f5ec; color: #08979c; }
+.tag-risk-high { background: #ffe7ba; color: #fa541c; }
+.tag-risk-mid  { background: #fff1b8; color: #d48806; }
+.tag-risk-none { background: #d9f7be; color: #389e0d; }
+.tag-plain  { background: #fafafa; color: rgba(0,0,0,.65); border: 1px solid #f0f0f0; }
+.tag-vpt { font-weight: 700; background: none; padding: 1px 4px; }
+.vpt-p0 { color: #ff4d4f; } .vpt-p1 { color: #fa8c16; } .vpt-p2 { color: #d4b106; } .vpt-p3 { color: #1890ff; } .vpt-p4 { color: #8c8c8c; }
+.tag-status { background: #e6f4ff; color: #1668dc; }
+.tag-status-done { background: #d9f7be; color: #389e0d; }
+.tag-status-warn { background: #fff1b8; color: #d48806; }
+.tag-status-off { background: #f5f5f5; color: rgba(0,0,0,.45); }
+
+.state-tabs { display: flex; align-items: center; gap: 28px; border-bottom: 1px solid #f0f0f0; padding: 6px 0 0; }
+.state-tab { padding: 10px 2px; cursor: pointer; color: rgba(0,0,0,.65); font-size: 14px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.state-tab:hover { color: #1668dc; }
+.state-tab.active { color: #1668dc; border-bottom-color: #1668dc; font-weight: 500; }
+.state-tabs .st-spacer { flex: 1; }
+.state-tabs .st-actions { display: flex; gap: 20px; padding-bottom: 8px; }
+.state-tabs .st-actions a.disabled { color: #bfbfbf; cursor: not-allowed; }
+
+.table-wrap { overflow-x: auto; margin-top: 10px; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.grid th {
+  background: #fafafa; color: rgba(0,0,0,.85); font-weight: 600; text-align: left;
+  padding: 10px 12px; border-bottom: 1px solid #f0f0f0; white-space: nowrap;
+}
+table.grid th .sort-arrows { display: inline-flex; flex-direction: column; margin-left: 4px; vertical-align: middle; color: #bfbfbf; }
+table.grid td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: rgba(0,0,0,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+table.grid tbody tr:hover { background: #f5faff; }
+table.grid .cell-link { color: #1668dc; cursor: pointer; }
+table.grid .ops { display: flex; gap: 6px; }
+.icon-btn {
+  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #d9d9d9; border-radius: 4px; background: #fff; cursor: pointer; color: #595959; transition: all .2s;
+}
+.icon-btn:hover { border-color: #1668dc; color: #1668dc; }
+.icon-btn.danger:hover { border-color: #ff4d4f; color: #ff4d4f; }
+
+.pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 14px 0 4px; font-size: 13px; color: rgba(0,0,0,.65); }
+.pagination .pg-item { min-width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #d9d9d9; border-radius: 4px; background: #fff; cursor: pointer; }
+.pagination .pg-item.active { border-color: #1668dc; color: #1668dc; }
+.pagination .pg-item:hover { border-color: #1668dc; color: #1668dc; }
+.pagination .pg-jump { width: 46px; }
+
+.select-bar { display: flex; align-items: center; gap: 16px; padding: 10px 0 2px; font-size: 13px; color: rgba(0,0,0,.65); }
+.select-bar .sb-right { margin-left: auto; display: flex; gap: 18px; }
+.select-bar a { font-size: 13px; }
+.select-bar a.disabled { color: #bfbfbf; cursor: not-allowed; }
+
+.empty { text-align: center; padding: 50px 0; color: rgba(0,0,0,.45); }
+.empty svg { color: #d9d9d9; }
+.empty div { margin-top: 8px; font-size: 13px; }
+
+/* 弹窗 */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; z-index: 200; overflow-y: auto; padding: 40px 0; }
+.modal { background: #fff; border-radius: 8px; width: 900px; max-width: 94vw; padding: 24px 28px; position: relative; box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; }
+.modal-close { position: absolute; right: 18px; top: 14px; cursor: pointer; color: #8c8c8c; font-size: 16px; line-height: 1; }
+.modal-close:hover { color: rgba(0,0,0,.66); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 40px; }
+.form-item { display: flex; align-items: flex-start; gap: 8px; }
+.form-item label { width: 96px; text-align: right; line-height: 28px; font-size: 13px; color: rgba(0,0,0,.66); flex-shrink: 0; white-space: nowrap; }
+.form-item label .req { color: #ff4d4f; margin-right: 2px; }
+.form-item .input, .form-item .select { flex: 1; width: 100%; }
+.form-item.disabled .input, .form-item.disabled .select { background: #f5f5f5; color: #bfbfbf; cursor: not-allowed; }
+.form-section { font-size: 14px; font-weight: 600; margin: 20px 0 12px; }
+.form-item label.ta-label { line-height: 28px; }
+.form-item textarea { flex: 1; border: 1px solid #d9d9d9; border-radius: 4px; padding: 6px 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 70px; outline: none; }
+.form-item textarea:focus { border-color: #1668dc; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+.message { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); background: #fff; border-radius: 6px; padding: 8px 16px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 300; font-size: 13px; }
+.message.success { color: #52c41a; }
+.message.error { color: #ff4d4f; }
+
+/* 仪表盘 */
+.dash-top { display: flex; align-items: center; gap: 8px; padding: 6px 0 12px; color: rgba(0,0,0,.66); font-size: 13px; }
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.asset-card { display: flex; }
+.asset-card .ac-left { width: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-right: 1px solid #f0f0f0; padding-right: 10px; }
+.asset-card .ac-total { font-size: 22px; font-weight: 600; color: #1668dc; }
+.asset-card .ac-grid { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); }
+.asset-card .ac-cell { padding: 14px 8px 14px 24px; }
+.asset-card .ac-cell .k { color: rgba(0,0,0,.55); font-size: 13px; margin-bottom: 6px; white-space: nowrap; }
+.asset-card .ac-cell .v { font-size: 17px; color: rgba(0,0,0,.85); }
+
+.vul-status-card { position: relative; }
+.vul-status-card .vs-select { position: absolute; right: 16px; top: 10px; }
+.vul-status-flex { display: flex; align-items: center; gap: 34px; padding: 6px 0; }
+.vul-status-donut { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 130px; flex-shrink: 0; }
+.vul-status-donut .num { font-size: 22px; font-weight: 600; color: #1668dc; }
+.vul-status-legend { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 10px; }
+.vs-cell .k { display: flex; align-items: center; gap: 6px; color: rgba(0,0,0,.55); font-size: 13px; }
+.vs-cell .v { font-size: 17px; margin-top: 4px; padding-left: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+.trend-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+.trend-card { background: #fff; border-radius: 6px; padding: 16px; display: flex; gap: 10px; }
+.trend-card .tc-left { width: 112px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0; flex-shrink: 0; }
+.trend-card .tc-title { color: rgba(0,0,0,.66); font-size: 13px; white-space: nowrap; }
+.trend-card .tc-num { font-size: 22px; color: rgba(0,0,0,.85); }
+.trend-card .tc-cmp { display: flex; align-items: center; justify-content: space-between; color: rgba(0,0,0,.55); font-size: 12px; margin-top: 10px; gap: 4px; }
+.trend-card .tc-up { color: #ff4d4f; font-weight: 500; white-space: nowrap; }
+
+.perspective-tabs { display: flex; gap: 10px; margin: 12px 0; }
+.psp-tab { height: 30px; padding: 0 16px; border-radius: 4px; border: 1px solid #d9d9d9; background: #fff; font-size: 13px; display: inline-flex; align-items: center; cursor: pointer; color: rgba(0,0,0,.75); }
+.psp-tab:hover { border-color: #1668dc; color: #1668dc; }
+.psp-tab.active { background: #1a6de0; border-color: #1a6de0; color: #fff; }
+
+.dash-charts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 4px; }
+.chart-card .cc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.chart-card .cc-title { font-size: 15px; font-weight: 600; }
+.pie-flex { display: flex; align-items: center; gap: 18px; }
+.legend-list { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.legend-list .lg-row { display: flex; align-items: center; gap: 8px; color: rgba(0,0,0,.75); }
+.legend-list .lg-swatch { width: 22px; height: 12px; border-radius: 2px; }
+.repair-donut-wrap { display: flex; align-items: center; justify-content: center; gap: 30px; padding: 10px 0; }
+.repair-donut-wrap .rd-stats { display: flex; flex-direction: column; gap: 14px; font-size: 13px; color: rgba(0,0,0,.65); white-space: nowrap; }
+.repair-donut-wrap .rd-stats .big { font-size: 20px; color: rgba(0,0,0,.85); }
+.repair-donut-wrap .rd-stats .green { color: #52c41a; font-size: 20px; }
+.top5-list { display: flex; flex-direction: column; gap: 20px; padding: 10px 0 4px; }
+.top5-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.top5-row .t5-name { width: 92px; color: #1668dc; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top5-row .t5-bar { flex: 1; height: 6px; background: #f0f0f0; border-radius: 3px; position: relative; }
+.top5-row .t5-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: #1a6de0; border-radius: 3px; min-width: 10px; }
+.top5-row .t5-val { width: 40px; text-align: right; color: rgba(0,0,0,.75); }
+
+/* 报表 / 详情 / VPT */
+.report-color-note { font-size: 12px; color: rgba(0,0,0,.65); margin-top: 10px; line-height: 1.9; }
+.report-color-note .n-green { color: #52c41a; font-weight: 600; }
+.report-color-note .n-yellow { color: #d4b106; font-weight: 600; }
+.report-color-note .n-red { color: #ff4d4f; font-weight: 600; }
+
+.detail-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.detail-top .dt-actions { margin-left: auto; display: flex; gap: 18px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 250px; gap: 12px; align-items: start; }
+.field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 20px; font-size: 13px; }
+.field-grid .fg-item { display: flex; gap: 4px; min-width: 0; }
+.field-grid .fg-item .k { color: rgba(0,0,0,.5); white-space: nowrap; }
+.field-grid .fg-item .v { color: rgba(0,0,0,.8); word-break: break-all; }
+.desc-block { font-size: 13px; line-height: 1.9; color: rgba(0,0,0,.8); white-space: pre-wrap; }
+
+.timeline { padding: 4px 0 0 4px; }
+.tl-item { position: relative; padding: 0 0 18px 18px; border-left: 1px solid #e8e8e8; margin-left: 5px; }
+.tl-item:last-child { border-left-color: transparent; }
+.tl-item::before { content: ''; position: absolute; left: -5px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid #1a6de0; }
+.tl-item .tl-time { font-size: 12px; color: rgba(0,0,0,.65); }
+.tl-item .tl-body { font-size: 13px; color: rgba(0,0,0,.8); margin-top: 4px; line-height: 1.6; }
+
+.vpt-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+.vpt-note { background: #fdf6c9; border-radius: 8px; padding: 18px 16px; font-size: 13px; line-height: 1.8; color: rgba(0,0,0,.8); max-height: 760px; overflow-y: auto; }
+.vpt-note h4 { font-size: 14px; margin: 12px 0 6px; }
+.vpt-note h4:first-child { margin-top: 0; }
+.vpt-note ul { padding-left: 18px; margin: 4px 0; }
+.vpt-note li { margin: 3px 0; }
+.vpt-note .indent-quote { background: #fbe89a; border-radius: 4px; padding: 8px 10px; margin: 6px 0; }
+.vpt-section-title { font-size: 14px; font-weight: 600; margin: 18px 0 12px; }
+.vpt-block { border-top: 1px solid #f0f0f0; padding-top: 16px; }
+.score-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 13px; flex-wrap: wrap; }
+.score-row .sr-label { width: 110px; text-align: right; color: rgba(0,0,0,.66); flex-shrink: 0; }
+.score-row .sr-label .req { color: #ff4d4f; }
+.score-row .pct-input { width: 90px; }
+.score-row .mini-input { width: 64px; }
+.score-row .sr-sub { color: rgba(0,0,0,.66); }
+.rule-card { border: 1px solid #f0f0f0; border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; }
+.rule-card .rc-head { display: flex; align-items: center; font-weight: 600; margin-bottom: 10px; font-size: 13px; }
+.rule-card .rc-del { margin-left: auto; color: #bfbfbf; cursor: pointer; font-size: 12px; }
+.rule-card .rc-del:hover { color: #ff4d4f; }
+.rule-cond-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rule-cond-row .select { width: 150px; }
+.rule-cond-row .select.op { width: 110px; }
+.rule-cond-row .rc-trash { color: #8c8c8c; cursor: pointer; background: none; border: none; }
+.rule-cond-row .rc-trash:hover { color: #ff4d4f; }
+.switch { width: 36px; height: 20px; border-radius: 10px; background: #ccc; position: relative; cursor: pointer; transition: background .2s; display: inline-block; vertical-align: middle; }
+.switch.on { background: #1a6de0; }
+.switch::after { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: left .2s; }
+.switch.on::after { left: 18px; }
+
+.row-flex { display: flex; align-items: center; gap: 12px; }
+.spacer { flex: 1; }
+.text-secondary { color: rgba(0,0,0,.45); font-size: 13px; }
+.kv-line { display: flex; align-items: flex-start; line-height: 1.9; font-size: 13px; }
+.kv-line .k { color: rgba(0,0,0,.45); white-space: nowrap; }
+.kv-line .v { color: rgba(0,0,0,.8); word-break: break-all; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #f0f0f0; background: #fafafa; border-radius: 3px; padding: 0 8px; font-size: 12px; height: 22px; line-height: 22px; color: rgba(0,0,0,.75); }
+.chip .x { cursor: pointer; color: #bfbfbf; }
+.chip .x:hover { color: #ff4d4f; }
+.mini-tabs { display: flex; gap: 24px; border-bottom: 1px solid #f0f0f0; margin-bottom: 14px; }
+.mini-tab { padding: 8px 2px; cursor: pointer; color: rgba(0,0,0,.65); border-bottom: 2px solid transparent; }
+.mini-tab.active { color: #1668dc; border-bottom-color: #1668dc; font-weight: 500; }
+.hyper { color: #1668dc; cursor: pointer; }
+
+/* ============================================================
+   修复建议助手（AI Agent · Beta）
+   ============================================================ */
+.fix-ai-entry { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e8e8e8; }
+.ai-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px;
+  border-radius: 15px; border: 1px solid #91caff;
+  background: linear-gradient(90deg, #e6f4ff, #f5faff);
+  color: #1668dc; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.ai-btn:hover { border-color: #1668dc; box-shadow: 0 2px 8px rgba(22,104,220,.18); }
+.ai-entry-note { font-size: 12px; color: rgba(0,0,0,.45); }
+.beta-mini { font-size: 9px; line-height: 1; padding: 2px 5px 3px; border-radius: 999px; background: #fffbeb; color: #d48806; border: 1px solid #ffe58f; font-weight: 700; letter-spacing: 1px; }
+
+.assistant-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 620px; max-width: 94vw;
+  background: #fff; box-shadow: -6px 0 24px rgba(0,0,0,.14); z-index: 150;
+  display: flex; flex-direction: column; animation: drawerIn .25s ease;
+}
+@keyframes drawerIn { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+.drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 140; animation: fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
+.drawer-head .dh-ic { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #4096ff, #1249b8); display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.drawer-head .dh-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.drawer-head .dh-sub { font-size: 12px; color: rgba(0,0,0,.45); margin-top: 2px; }
+.drawer-close { margin-left: auto; cursor: pointer; color: #8c8c8c; font-size: 18px; line-height: 1; }
+.drawer-close:hover { color: rgba(0,0,0,.66); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px 24px; }
+
+.ai-context { border: 1px solid #f0f0f0; background: #fafafa; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: rgba(0,0,0,.65); line-height: 1.8; margin-bottom: 14px; }
+.ai-context b { color: rgba(0,0,0,.85); }
+
+.step-list { border: 1px solid #f0f0f0; border-radius: 8px; padding: 6px 14px; margin-bottom: 14px; }
+.step-row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; color: rgba(0,0,0,.55); font-size: 13px; }
+.step-row .sp-ic { width: 18px; height: 18px; border-radius: 50%; background: #f0f0f0; color: transparent; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 3px; transition: background .3s; }
+.step-row .sp-note { margin-left: auto; font-size: 11px; color: #1668dc; padding-left: 10px; white-space: nowrap; }
+.mode-badge { font-size: 9px; line-height: 1; padding: 2px 5px 3px; border-radius: 999px; border: 1px solid #d9d9d9; color: rgba(0,0,0,.45); font-weight: 600; letter-spacing: 1px; vertical-align: 2px; }
+.step-row.doing .sp-ic { background: #1668dc; box-shadow: 0 0 0 3px rgba(22,104,220,.15); animation: spPulse 1s infinite; color: transparent; }
+.step-row.doing { color: rgba(0,0,0,.85); }
+.step-row.done .sp-ic { background: #52c41a; color: #fff; }
+@keyframes spPulse { 50% { box-shadow: 0 0 0 6px rgba(22,104,220,.05); } }
+
+.ai-result { display: flex; flex-direction: column; gap: 12px; }
+.advice-section { border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px 14px; }
+.advice-sec-title { font-size: 13px; font-weight: 600; color: rgba(0,0,0,.85); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.advice-sec-title .as-no { color: #1668dc; }
+.advice-sec-body { font-size: 13px; line-height: 1.85; color: rgba(0,0,0,.8); }
+.advice-sec-body ol { padding-left: 18px; }
+.advice-sec-body ol li { margin: 4px 0; }
+.cite { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #1668dc; background: #f0f7ff; border: 1px solid #d6e4ff; border-radius: 3px; padding: 0 5px; height: 17px; cursor: pointer; vertical-align: 1px; margin: 0 2px; white-space: nowrap; }
+.cite:hover { border-color: #1668dc; }
+.unknown-note { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #d48806; margin-top: 6px; line-height: 1.7; }
+.conf-band { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(0,0,0,.55); background: #fafafa; border: 1px solid #f0f0f0; border-radius: 6px; padding: 8px 10px; }
+.conf-band b { color: rgba(0,0,0,.75); }
+.conf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.drawer-foot { border-top: 1px solid #f0f0f0; padding: 12px 18px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.drawer-foot .df-note { font-size: 11px; color: rgba(0,0,0,.4); line-height: 1.5; }
+
+/* ============================================================
+   AI 漏洞研判（仪表盘 AI 入口 · 与修复建议助手同一设计语言）
+   ============================================================ */
+.ai-judge-card { border: 1px solid #d6e4ff; background: linear-gradient(180deg, #f7fbff, #fff 45%); }
+.aij-head { display: flex; align-items: center; gap: 10px; }
+.aij-head .dh-ic { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #4096ff, #1249b8); display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.aij-title { font-size: 15px; font-weight: 600; }
+.aij-sub { margin-left: auto; font-size: 12px; color: rgba(0,0,0,.45); }
+.aij-sum { display: flex; align-items: flex-end; margin: 14px 0 12px; padding-top: 12px; border-top: 1px dashed #e8e8e8; }
+.aij-k { font-size: 12px; color: rgba(0,0,0,.5); }
+.aij-n { font-size: 26px; font-weight: 600; color: #ff4d4f; line-height: 1.25; }
+.aij-n span { font-size: 13px; font-weight: 400; margin-left: 3px; }
+.aij-typ { margin-left: auto; text-align: right; font-size: 12px; color: rgba(0,0,0,.5); }
+.aij-typ b { display: block; font-size: 14px; color: rgba(0,0,0,.85); margin-top: 3px; font-weight: 600; }
+.aij-item { border: 1px solid #f0f0f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; cursor: pointer; transition: border-color .2s, background .2s; }
+.aij-item:hover { border-color: #91caff; background: #f7fbff; }
+.aij-row { display: flex; align-items: center; gap: 8px; }
+.aij-name { font-weight: 600; color: rgba(0,0,0,.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aij-score { margin-left: auto; font-size: 18px; font-weight: 600; color: #ff4d4f; white-space: nowrap; }
+.aij-score span { font-size: 12px; font-weight: 400; margin-left: 2px; }
+.aij-desc { font-size: 12.5px; color: rgba(0,0,0,.7); line-height: 1.7; margin-top: 6px; }
+.aij-trace { display: block; font-size: 11px; color: rgba(0,0,0,.4); margin-top: 3px; }
+.aij-foot { display: flex; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e8e8e8; font-size: 12px; color: rgba(0,0,0,.45); }
+.aij-foot a { margin-left: auto; font-size: 12px; }
+/* 系统设置（AI 大模型接入）页 */
+.llm-status-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(0,0,0,.65); margin-bottom: 4px; }
+.llm-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.llm-dot.ok { background: #52c41a; }
+.llm-dot.bad { background: #ff4d4f; }
+.llm-test-result { margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
+.llm-test-result.ok { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+.llm-test-result.bad { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+.llm-hint { font-size: 12px; color: #8c8c8c; line-height: 1.8; }
+.llm-field-hint { font-size: 12px; color: #8c8c8c; line-height: 28px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <svg width="30" height="30" viewBox="0 0 32 32">
+        <defs><linearGradient id="logo-lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4096ff"/><stop offset="1" stop-color="#1249b8"/></linearGradient></defs>
+        <path d="M16 1.5l12.5 6.8v8.8c0 7-5 12.5-12.5 14.4C8.5 29.6 3.5 24.1 3.5 17.1V8.3L16 1.5z" fill="url(#logo-lg)"/>
+        <path d="M16 5l9 4.9v7c0 5.2-3.7 9.3-9 10.9-5.3-1.6-9-5.7-9-10.9v-7L16 5z" fill="#fff" opacity=".14"/>
+        <path d="M16 9.2l1.7 5.1 5.1 1.7-5.1 1.7L16 22.8l-1.7-5.1-5.1-1.7 5.1-1.7L16 9.2z" fill="#fff"/>
+        <circle cx="24.2" cy="9.8" r="1.5" fill="#fff" opacity=".9"/>
+        <circle cx="7.8" cy="22.2" r="1.2" fill="#fff" opacity=".7"/>
+      </svg>
+      <div class="logo-text">
+        <div class="logo-main"><span class="logo-cn">鉴微</span><span class="logo-ai">AI助手</span><i class="beta-sup">测试版</i></div>
+      </div>
+    </div>
+    <nav class="menu" id="menu"></nav>
+    <div class="sidebar-footer">
+      <span class="sf-user" id="sf-user">
+        <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2 12.2c.8-2.5 2.7-3.7 5-3.7s4.2 1.2 5 3.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span>tester</span>
+      </span>
+      <button class="sf-collapse" id="collapse-btn" title="收起侧栏">«</button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-left">
+        <span class="tb-btn" id="home-btn" title="首页">
+          <svg width="17" height="17" viewBox="0 0 17 17"><path d="M2.5 8.2L8.5 3l6 5.2v5.3a1 1 0 0 1-1 1h-3.6v-4h-2.8v4H3.5a1 1 0 0 1-1-1V8.2z" fill="none" stroke="#8c8c8c" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        </span>
+      </div>
+      <div class="tb-right">
+        <span class="tb-user" title="个人中心">
+          <svg width="15" height="15" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2 12.2c.8-2.5 2.7-3.7 5-3.7s4.2 1.2 5 3.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          tester
+        </span>
+        <span class="tb-btn" title="文档">
+          <svg width="15" height="15" viewBox="0 0 15 15"><rect x="2" y="2.5" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6.8 5h4M6.8 7.5h4M6.8 10h4M3.8 5h1.2M3.8 7.5h1.2M3.8 10h1.2" stroke="currentColor" stroke-width="1"/></svg>
+        </span>
+        <span class="tb-btn" title="关于">
+          <svg width="15" height="15" viewBox="0 0 15 15"><circle cx="7.5" cy="7.5" r="5.7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 6.8v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="7.5" cy="4.7" r=".9" fill="currentColor"/></svg>
+        </span>
+        <span class="tb-btn" id="logout-btn" title="登出">
+          <svg width="15" height="15" viewBox="0 0 15 15"><path d="M8.5 2.5H3.8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h4.7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 7.5H12M10 5.5l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </div>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<div id="modal-root"></div>
+
+<script>
+"use strict";
+/* ================================================================
+ * 鉴微 INSIGHT —— 前端复刻版（离线单文件）
+ * - 已去除登录，直接进入仪表盘
+ * - window.InsightAgentAPI 为预留的 Agent 接入层
+ * ================================================================ */
+
+/* ================================================================
+ * 一、Agent API 预留层
+ * ================================================================ */
+const AgentBridge = (() => {
+  const listeners = {};
+  const handlers = {};
+  /** agent 动作 -> 后端路由映射（远程模式生效；业务数据类动作保持本地） */
+  const REMOTE_ROUTES = {
+    generateJudgement: '/agent-api/judgement',
+    generateFixAdvice: '/agent-api/fix-advice',
+    adoptFixAdvice: '/agent-api/fix-advice/adopt',
+    createTicket: '/agent-api/tickets',
+  };
+  // Vercel 同源部署版：前后端同域托管，远程模式 + 空 baseUrl 即同源直连。
+  // 本地双击打开（file://）为本地模拟模式；要连本地后端可在大模型配置页切换远程 + http://127.0.0.1:8000。
+  const config = { mode: 'local', baseUrl: '', headers: {} };
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    config.mode = 'remote';
+    config.baseUrl = '';   // 同源：api/index.py 与本页面在同一个域名下
+  }
+  try {   // 运行模式持久化：演示时切换一次即可，刷新/重开不丢
+    const saved = JSON.parse(localStorage.getItem('insight-agent-mode') || 'null');
+    if (saved && saved.mode) { config.mode = saved.mode; config.baseUrl = saved.baseUrl || ''; config.headers = saved.headers || {}; }
+  } catch (e) {}
+  async function remoteCall(action, payload) {
+    try {
+      const resp = await fetch(config.baseUrl + REMOTE_ROUTES[action], {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, config.headers, adminHeaders()),
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (!json || typeof json.ok === 'undefined') return { ok: false, error: '响应不符合契约：缺少 ok 字段（见接入契约文档）' };
+      return json;
+    } catch (e) {
+      return { ok: false, error: '远程 API 调用失败：' + e.message };
+    }
+  }
+  function emit(event, payload) {
+    (listeners[event] || []).slice().forEach(cb => { try { cb(payload); } catch (e) { console.error(e); } });
+    (listeners['*'] || []).slice().forEach(cb => { try { cb({ event, payload }); } catch (e) { console.error(e); } });
+  }
+  return {
+    /** 切换接入模式：configure({ mode:'local' }) 或 configure({ mode:'remote', baseUrl:'https://...', headers:{Authorization:'Bearer ...'} }) */
+    configure(patch) {
+      Object.assign(config, patch);
+      try { localStorage.setItem('insight-agent-mode', JSON.stringify({ mode: config.mode, baseUrl: config.baseUrl, headers: config.headers })); } catch (e) {}
+      return { ...config };
+    },
+    getConfig: () => ({ ...config }),
+    async call(action, payload = {}) {
+      emit('before:' + action, payload);
+      let result;
+      if (config.mode === 'remote' && REMOTE_ROUTES[action]) {
+        result = await remoteCall(action, payload);   // 远程模式：agent 动作直接走真实后端
+      } else if (handlers[action]) {
+        result = await handlers[action](payload);     // 已被 agent / 真实 API 接管
+      } else if (window.LocalActions && window.LocalActions[action]) {
+        result = await window.LocalActions[action](payload);   // 本地模拟（测试数据）
+      } else {
+        result = { ok: false, error: '未知动作 ' + action };
+      }
+      emit('after:' + action, { payload, result });
+      return result;
+    },
+    register(action, fn) { handlers[action] = fn; },
+    unregister(action) { delete handlers[action]; },
+    on(event, cb) { (listeners[event] = listeners[event] || []).push(cb); },
+    off(event, cb) { const a = listeners[event] || []; const i = a.indexOf(cb); if (i > -1) a.splice(i, 1); },
+    _routes: REMOTE_ROUTES,
+  };
+})();
+window.InsightAgentAPI = AgentBridge;
+
+/* 管理口令：公网部署时服务端设置 ADMIN_TOKEN 后，写操作与 LLM 配置需携带。
+ * 仅存本机 localStorage（insight-admin-token），在「系统设置」页填写。 */
+const ADMIN_TOKEN_KEY = 'insight-admin-token';
+function getAdminToken() { try { return localStorage.getItem(ADMIN_TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function setAdminToken(t) { try { t ? localStorage.setItem(ADMIN_TOKEN_KEY, t) : localStorage.removeItem(ADMIN_TOKEN_KEY); } catch (e) {} }
+function adminHeaders(extra) { const t = getAdminToken(); return Object.assign(t ? { 'X-Admin-Token': t } : {}, extra || {}); }
+
+/* ================================================================
+ * 二、常量与等级评定规则（与原版一致）
+ * ================================================================ */
+const LEVELS = ['超危', '高危', '中危', '低危', '信息'];
+const LEVEL_CLS = { '超危': 'tag-super', '高危': 'tag-high', '中危': 'tag-medium', '低危': 'tag-low', '信息': 'tag-info' };
+const LEVEL_PIE_COLOR = { '超危': '#f5222d', '高危': '#ffc069', '中危': '#fadb14', '低危': '#2f54eb', '信息': '#5cdbd3' };
+const VPT_RANGE = [   // P0~P4 分值区间（VPT 配置页 / 等级映射与排序）
+  { key: 'P0', cls: 'vpt-p0', label: '大于 80 小于等于 100' },
+  { key: 'P1', cls: 'vpt-p1', label: '大于 74 小于等于 80' },
+  { key: 'P2', cls: 'vpt-p2', label: '大于 49 小于等于 74' },
+  { key: 'P3', cls: 'vpt-p3', label: '大于 0 小于等于 49' },
+  { key: 'P4', cls: 'vpt-p4', label: '等于 0' },
+];
+const VPT_LEVEL_DESC = {
+  P0: { risk: '超危风险', desc: '暴露在外部网络中的关键资产存在可被远程利用的漏洞，或核心资产存在可直接获取权限的漏洞，需要立即修复。' },
+  P1: { risk: '高危风险', desc: '存在潜在风险，可能导致敏感信息泄露、权限提升或业务中断，需要尽快安排修复。' },
+  P2: { risk: '中危风险', desc: '存在一定安全风险，利用条件有限或影响范围可控，按常规周期修复。' },
+  P3: { risk: '低危风险', desc: '风险较低，利用难度大或影响轻微，可择机修复。' },
+  P4: { risk: '信息风险', desc: '信息类漏洞或经评估暂无风险，可暂不处理。' },
+};
+/** 漏洞等级 -> 漏洞属性基础分（VPT 标准规则） */
+const LEVEL_SCORE = { '超危': 100, '高危': 80, '中危': 50, '低危': 10, '信息': 0 };
+
+/* ================================================================
+ * 三、模拟数据（取自 demo 环境的示例快照）
+ * ================================================================ */
+const VUL_TYPES_IP = ['未授权访问漏洞','逻辑漏洞','其他','远程代码执行漏洞'];
+// 测试数据集：覆盖多种类型 / 等级 / VPT / 处置状态的经典漏洞（描述与建议为自撰写通用文案）
+// 行格式：[id, 名称, CVE, 类型, VPT, 等级, 影响资产, 来源, 状态]
+const IP_VULNS_RAW = [
+  [228,'ZTE ZXR10 1800-2S 安全漏洞','CVE-2017-10930','未授权访问漏洞','P0','超危','172.31.18.33','批量导入','待处理'],
+  [229,'OpenSSH 代码问题漏洞','CVE-2023-38408','逻辑漏洞','P0','超危','47.95.246.187','wjg-demo','待处理'],
+  [230,'HTTP/2 Bomb 远程拒绝服务漏洞(CVE-2026-49975)','CVE-2026-49975','其他','P0','超危','192.168.2.102','批量导入','待处理'],
+  [231,'DocCms 代码问题漏洞','CVE-2019-16192','逻辑漏洞','P0','超危','255.255.255.5','批量导入','待处理'],
+  [232,'OpenSSH 安全漏洞','CVE-2023-28531','其他','P0','超危','47.95.246.187','wjg-demo','待处理'],
+  [233,'Redis 代码注入漏洞','CVE-2022-0543','远程代码执行漏洞','P0','超危','192.168.1.12','test4、test1','待处理'],
+  [234,'Redis 代码注入漏洞','CVE-2022-0543','远程代码执行漏洞','P0','超危','192.168.1.11','test4、test1','待处理'],
+  [235,'Redis 代码注入漏洞','CVE-2022-0543','远程代码执行漏洞','P0','超危','192.168.1.10','test4、test1','待处理'],
+  [236,'Redis 代码注入漏洞','CVE-2022-0543','远程代码执行漏洞','P0','超危','192.168.1.13','test','待处理'],
+  [237,'Redis 代码注入漏洞','CVE-2022-0543','远程代码执行漏洞','P0','超危','192.168.1.12','test','待处理'],
+  [240,'Apache Log4j2 远程代码执行漏洞(Log4Shell)','CVE-2021-44228','远程代码执行漏洞','P0','超危','172.17.9.37','洞鉴01','待处理'],
+  [241,'Windows SMBv1 远程代码执行漏洞(永恒之蓝)','CVE-2017-0144','远程代码执行漏洞','P0','超危','255.255.255.5','批量导入','待处理'],
+  [242,'Struts2 S2-045 远程代码执行漏洞','CVE-2017-5638','远程代码执行漏洞','P0','超危','172.16.1.2','洞鉴01','待处理'],
+  [243,'Oracle WebLogic 管理控制台未授权命令执行漏洞','CVE-2020-14882','远程代码执行漏洞','P0','超危','255.255.255.3','批量导入','待处理'],
+  [244,'ThinkPHP 5.x 远程代码执行漏洞','CVE-2018-20062','远程代码执行漏洞','P0','超危','255.255.255.6','洞鉴01','待处理'],
+  [245,'Redis 弱口令漏洞','(空)','弱口令漏洞','P2','中危','192.168.2.10','手动提交','待处理'],
+  [246,'Apache HTTP Server 路径穿越漏洞','CVE-2021-41773','路径遍历漏洞','P1','高危','172.16.1.2','洞鉴01','待处理'],
+  [247,'Apache Shiro rememberMe 反序列化漏洞','CVE-2016-4437','反序列化漏洞','P1','高危','172.17.9.37','wjg-demo','待处理'],
+  [248,'Spring Framework 远程代码执行漏洞(Spring4Shell)','CVE-2022-22965','远程代码执行漏洞','P1','高危','172.17.9.37','wjg-demo','确认中'],
+  [249,'Fastjson 反序列化远程代码执行漏洞','CVE-2022-25845','反序列化漏洞','P1','高危','172.17.9.37','批量导入','待处理'],
+  [250,'Sudo 本地权限提升漏洞(Baron Samedit)','CVE-2021-3156','其他','P1','高危','10.0.0.1','手动提交','待处理'],
+  [251,'OpenSSL Heartbleed 心脏出血漏洞','CVE-2014-0160','敏感信息泄露漏洞','P1','高危','255.255.255.4','批量导入','待处理'],
+  [252,'Linux 内核 Dirty COW 竞态条件提权漏洞','CVE-2016-5195','其他','P0','超危','192.168.2.10','手动提交','待处理'],
+  [253,'OpenSSH 用户名枚举漏洞','CVE-2018-15473','其他','P3','低危','10.0.0.1','洞鉴01','待处理'],
+  [254,'GitLab ExifTool 远程代码执行漏洞','CVE-2021-22205','远程代码执行漏洞','P0','超危','172.16.1.2','洞鉴01','修复中'],
+  [255,'Jenkins 反序列化远程代码执行漏洞','CVE-2018-1000861','反序列化漏洞','P1','高危','172.16.1.2','批量导入','待复测'],
+  [256,'Confluence OGNL 注入远程代码执行漏洞','CVE-2022-26134','远程代码执行漏洞','P0','超危','10.0.0.1','洞鉴01','已修复'],
+  [257,'Tomcat PUT 方法任意文件写入漏洞','CVE-2017-12615','文件上传漏洞','P1','高危','255.255.255.2','批量导入','已修复'],
+  [258,'Zabbix 后端敏感信息泄露漏洞','CVE-2022-23134','敏感信息泄露漏洞','P2','中危','255.255.255.6','洞鉴01','误报'],
+  [259,'Drupal 远程代码执行漏洞(Drupalgeddon2)','CVE-2018-7600','远程代码执行漏洞','P2','中危','255.255.255.2','批量导入','忽略'],
+];
+const WEB_VULNS_RAW = [
+  [301,'Google Golang /debug/vars 信息泄露漏洞','(空)','敏感信息泄露漏洞','P0','超危','http://192.168.0.1:9...','手动提交、洞鉴01','待处理'],
+  [302,'标题','(空)','点击劫持','P0','超危','https://oa.example-g...','手动提交','待处理'],
+  [303,'SpringBoot Actuator Jolokia 端点未授权访问','(空)','未授权访问漏洞','P1','高危','http://172.17.9.37:9...','批量导入','待处理'],
+  [304,'SpringBoot Actuator Jolokia 端点未授权访问','(空)','未授权访问漏洞','P1','高危','http://172.17.9.37:9...','批量导入','待处理'],
+  [305,'SpringBoot Actuator Jolokia 端点未授权访问','(空)','未授权访问漏洞','P1','高危','http://172.17.9.37:8...','手动提交','待处理'],
+  [306,'Swagger UI 敏感信息泄露','(空)','其他','P2','中危','http://192.168.1.1:8...','批量导入','待处理'],
+  [307,'http慢速攻击','CVE-2007-6750','其他','P2','中危','http://192.168.1.1:8...','批量导入','待处理'],
+  [308,'内容安全策略 (CSP) 配置不当 / 缺失','(空)','其他','P2','中危','http://192.168.1.1:8...','批量导入','待处理'],
+  [309,'认证验收-网站探测漏洞','(空)','不安全的配置漏洞','P2','中危','https://192.0.2.99:4...','批量导入','待处理'],
+  [310,'Go pprof 调试信息泄露漏洞','(空)','敏感信息泄露漏洞','P2','中危','http://192.168.0.1:9...','洞鉴01','待处理'],
+  [311,'Java 应用反序列化远程代码执行漏洞','(空)','反序列化漏洞','P0','超危','http://172.17.9.37:8080/','手动提交','待处理'],
+  [312,'SQL 注入漏洞(联合查询型)','(空)','SQL注入漏洞','P1','高危','https://oa.example-g.../list.jsp','手动提交','确认中'],
+  [313,'存储型 XSS 漏洞(留言板)','(空)','XSS漏洞','P2','中危','http://192.168.0.1:9.../msg','洞鉴01','待处理'],
+  [314,'任意文件上传漏洞(可上传脚本)','(空)','文件上传漏洞','P0','超危','http://172.16.1.2:8080/upload','洞鉴01','修复中'],
+  [315,'SSRF 服务端请求伪造漏洞(出网探测)','(空)','其他','P1','高危','http://10.0.0.1:8080/webhook','wjg-demo','待复测'],
+  [316,'.git 目录敏感信息泄露','(空)','敏感信息泄露漏洞','P2','中危','http://255.255.255.6:80/.git/','批量导入','已修复'],
+  [317,'目录遍历漏洞(可列出目录结构)','(空)','路径遍历漏洞','P3','低危','http://255.255.255.3:8080/static/','洞鉴01','待处理'],
+  [318,'管理后台弱口令漏洞(admin/admin)','(空)','弱口令漏洞','P1','高危','https://oa.example-g.../admin','手动提交','待处理'],
+  [319,'跨站请求伪造漏洞(CSRF 修改密码接口)','(空)','CSRF漏洞','P2','中危','http://192.168.1.1:8.../password','批量导入','待处理'],
+  [320,'TLS 1.0 不安全协议启用','(空)','不安全的配置漏洞','P4','信息','https://1.1.1.1:443/','洞鉴01','忽略'],
+  [321,'CORS 跨域策略配置不当','(空)','不安全的配置漏洞','P2','中危','http://192.168.0.1:9.../api','批量导入','已修复'],
+];
+// 重点演示漏洞的定制文案（描述/危害/修复建议），其余漏洞使用通用文案
+const VULN_OVERRIDES = {
+  240: {
+    desc: 'Apache Log4j2 是 Java 应用广泛使用的日志组件。2.15.0 之前版本的 JNDI Lookup 功能存在远程代码执行漏洞（Log4Shell），攻击者通过可被记录的输入触发 JNDI 加载远程恶意类，即可在目标服务器上执行任意代码。',
+    danger: '利用门槛极低（仅需发送一条包含恶意 JNDI 表达式的字符串），可无认证直接获取服务器控制权，进而横向移动、窃取数据或植入持久化后门。',
+    fix: '1. 将 log4j-core 升级至 2.17.1 及以上版本（本主机当前为 2.14.1）。 2. 短期缓解：移除 JNDI Lookup 插件或设置 log4j2.formatMsgNoLookups=true。 3. 排查应用日志与出网记录，确认是否已被利用，必要时开展应急处置。',
+  },
+  241: {
+    desc: 'Windows SMBv1 服务存在远程代码执行漏洞（永恒之蓝），攻击者无需认证、无需用户交互，即可利用特制数据包在目标主机上执行任意代码。',
+    danger: '可通过 445 端口直接入侵主机并植入勒索或蠕虫类程序（WannaCry 曾大规模利用该漏洞），影响为主机完全失陷并向内网横向扩散。',
+    fix: '1. 安装微软官方安全补丁并停用 SMBv1。 2. 临时缓解：通过防火墙限制 445 端口的来源访问。 3. 排查主机是否出现异常进程与新增账户。',
+  },
+  246: {
+    desc: 'Apache HTTP Server 2.4.49/2.4.50 存在路径穿越漏洞，攻击者利用点号穿越目录读取服务器上的任意文件；在启用 CGI 的环境还可进一步导致远程代码执行。本主机当前版本为 2.4.49，在受影响范围内。',
+    danger: '无需认证即可读取 Web 根目录之外的敏感文件（配置文件、源代码、密钥等）；若目标启用了 mod_cgi，可直接获得服务器命令执行权限。',
+    fix: '1. 将 httpd 升级至 2.4.51 及以上版本（本主机当前为 2.4.49）。 2. 临时缓解：对受影响路径增加访问控制或关闭对应目录的 CGI 支持。 3. 排查访问日志中含 ../ 的异常请求，确认是否已被利用。',
+  },
+  247: {
+    desc: 'Apache Shiro 存在 rememberMe 反序列化漏洞：1.2.4 及之前版本使用固定的 AES 密钥加密 rememberMe Cookie，攻击者可构造恶意序列化数据触发反序列化，实现远程代码执行。',
+    danger: '掌握默认密钥即可无需登录直接接管服务；配合内存马等手段可隐蔽驻留，常规审计难以发现。',
+    fix: '1. 升级 Shiro 至 1.2.5 以上版本，并将 rememberMe 加密密钥更换为随机生成的高强度密钥。 2. 临时缓解：移除或禁用 rememberMe 功能。 3. 排查应用是否存在内存马与异常会话。',
+  },
+  314: {
+    desc: '目标站点的文件上传接口未校验文件类型与内容，攻击者可上传脚本文件（Webshell）并获得服务器控制权。',
+    danger: '上传 Webshell 后可直接执行系统命令，读取数据库配置、篡改页面，并以此为跳板渗透内网。',
+    fix: '1. 对上传接口增加白名单校验（文件类型、后缀、内容），重命名存储并去除执行权限。 2. 清理已上传的可疑脚本文件并排查是否被利用。 3. 对上传目录统一设置禁止脚本执行。',
+  },
+};
+function buildVulns(raw) {
+  return raw.map(r => Object.assign({
+    id: r[0], name: r[1], cve: r[2], type: r[3], vpt: r[4], level: r[5],
+    asset: r[6], source: r[7], status: r[8],
+    org: '根组织机构', domain: '默认域',
+    owner: 'Admin', coOwner: '杨昭华', assetName: 'BJYH', biz: '消息推送服务',
+    firstFound: '1970-01-01 08:00:45', lastUpdate: '2026-05-09 10:41:42', lastFound: '1970-01-01 08:00:45',
+    proto: 'http', port: '3306', service: '(空)', detect: '未知', exploit: '远程利用', complexity: '(空)',
+    planFix: '2026-09-15 03:00:00', cvss: '9.8', cnvd: 'CNVD-2017-34593', cnnvd: 'CNNVD-201709-933', ctid: 'CT-60931',
+    exp: '无', poc: '无', patch: '无', wild: '否',
+    tags: ['未修复', '等保'],
+    desc: r[1] + '：检测到目标系统存在该安全漏洞，攻击者可能利用该漏洞获取敏感信息或在一定条件下影响业务可用性。',
+    danger: '攻击者可在没有认证的情况下直接访问对应接口，可能造成数据被非法增删改查，且难以通过定位用户进行异常排查。',
+    fix: '1. 及时升级官方发布的安全补丁。 2. 对外收敛暴露面，关闭不必要的端口与服务。 3. 完善访问控制与身份校验逻辑。',
+    refs: [], components: '', extProps: {},
+  }, VULN_OVERRIDES[r[0]] || {}));
+}
+const DB = {
+  vulnsIp: buildVulns(IP_VULNS_RAW),
+  vulnsWeb: buildVulns(WEB_VULNS_RAW),
+  // 状态计数：由实际漏洞数据实时统计（见 DB 定义后方的 vulnCounts()），与 Tab/分页保持对称
+  vulnsIpCounts: null,
+  vulnsWebCounts: null,
+  vulTags: [
+    ['zhrs', '2026-08-27 15:44:24'], ['标签7', '2026-08-11 12:23:42'], ['标签6', '2026-08-11 12:23:42'],
+    ['标签5', '2026-08-11 12:23:42'], ['标签4', '2026-08-11 12:23:42'], ['标签3', '2026-08-11 12:23:41'],
+    ['标签2', '2026-08-11 12:23:41'], ['标签1', '2026-08-11 12:23:41'], ['888', '2026-06-22 17:51:43'],
+    ['测试', '2026-06-08 10:24:12'], ['TEST', '2026-05-11 15:46:26'], ['暴露面', '2026-05-08 10:54:18'],
+  ],
+  knowledge: [
+    ['LG webOS 安全漏洞','高危','其他','CVE-2023-6317','2024-04-09'],
+    ['Lenovo XClarity Controller 安全漏洞','低危','其他','CVE-2023-29056','2023-04-28'],
+    ['Liferay Portal和Liferay DXP 安全漏洞','高危','其他','CVE-2023-33950','2023-05-24'],
+    ['LimeSurvey 安全漏洞','高危','其他','CVE-2019-16185','2019-09-09'],
+    ['Android Chest Workout应用程序加密问题漏洞','高危','密码学问题漏洞','CVE-2014-5796','2014-09-09'],
+    ['datadynamics activereports \'arview2.ocx\'多个不安全方法漏洞','高危','其他','CVE-2008-5089','2008-11-14'],
+    ['Agenta 代码注入漏洞','高危','远程代码执行漏洞','CVE-2026-27952','2026-02-26'],
+    ['IBM CICS TX 加密问题漏洞','高危','密码学问题漏洞','CVE-2022-34319','2022-11-14'],
+    ['WordPress 插件跨站脚本漏洞','中危','XSS漏洞','CVE-2021-38357','2021-09-10'],
+    ['Citrix Access Gateway会话劫持漏洞','低危','敏感信息泄露漏洞','CVE-2007-0011','2007-11-05'],
+    ['Microsoft Hyper-V 安全漏洞','中危','其他','CVE-2024-43633','2024-11-12'],
+    ['Android 安全漏洞','超危','未授权访问漏洞','CVE-2017-18071','2018-04-11'],
+    ['Apache Log4j2 远程代码执行漏洞(Log4Shell)','超危','远程代码执行漏洞','CVE-2021-44228','2021-12-10'],
+    ['Windows SMBv1 远程代码执行漏洞(永恒之蓝)','超危','远程代码执行漏洞','CVE-2017-0144','2017-03-14'],
+    ['Struts2 S2-045 远程代码执行漏洞','超危','远程代码执行漏洞','CVE-2017-5638','2017-03-07'],
+    ['Apache Shiro rememberMe 反序列化漏洞','高危','反序列化漏洞','CVE-2016-4437','2016-05-24'],
+    ['Spring Framework 远程代码执行漏洞(Spring4Shell)','高危','远程代码执行漏洞','CVE-2022-22965','2022-03-31'],
+    ['Apache HTTP Server 路径穿越漏洞','高危','路径遍历漏洞','CVE-2021-41773','2021-10-05'],
+    ['Redis 沙箱逃逸代码执行漏洞','超危','远程代码执行漏洞','CVE-2022-0543','2022-02-28'],
+    ['OpenSSH 用户名枚举漏洞','低危','其他','CVE-2018-15473','2018-08-16'],
+  ],
+  intel: [
+    ['情报2','高危','(空)','其他','手动提交','(空)','(空)','(空)','2026-07-31 16:25:55'],
+    ['情报漏洞1','超危','CVE-2026-0302','其他','手动提交','(空)','(空)','(空)','2026-05-19 10:35:50'],
+  ],
+  assetsIp: [
+    ['172.17.9.37','测试用的12345','根组织机构','手动添加','(空)','test','高风险','Admin'],
+    ['172.17.9.37','测试用的12345','分公司A','手动添加','(空)','默认域','高风险','张三'],
+    ['172.17.9.37','测试','分公司A','1','(空)','默认域','高风险','张三'],
+    ['10.0.0.1','LITE-164测试','根组织机构','手动添加','(空)','test','无风险','Admin'],
+    ['172.16.1.2','测试000444','某部门','手动添加','(空)','默认域','无风险','柯李木_5mKC'],
+    ['192.168.2.10','192.168.2.10','根组织机构','手动添加','(空)','生产网段','无风险','admin_pQ5DiD'],
+    ['255.255.255.6','(空)','开发中心','手动添加','(空)','默认域','中风险','Admin'],
+    ['255.255.255.5','(空)','开发中心','手动添加','(空)','默认域','高风险','Admin'],
+    ['255.255.255.4','(空)','开发中心','手动添加','(空)','默认域','高风险','Admin'],
+    ['255.255.255.3','(空)','运维中心','手动添加','(空)','默认域','高风险','Admin'],
+    ['255.255.255.2','(空)','运维中心','手动添加','(空)','默认域','高风险','Admin'],
+  ],
+  assetsWeb: [
+    ['http://172.17.9.37:9...','测试','根组织机构','手动添加','办公网段','高风险','张三','周于茗'],
+    ['https://oa.example-g...','web资产测试','根组织机构','手动添加','办公网段','高风险','admin_pQ5DiD','(空)'],
+    ['http://192.168.0.1:9...','测试系统01','根组织机构','手动添加','办公网段','高风险','dn','(空)'],
+    ['https://1.1.1.1:443/','北京银行','根组织机构','手动添加','办公网段','无风险','王弼彪','(空)'],
+  ],
+  assetsDomain: [
+    ['121.com','test123','根组织机构','手动添加','默认域','无风险','朱晋辉','Admin'],
+  ],
+  assetsSubdomain: [
+    ['www.1.com','1.com','根组织机构','手动添加','默认域','朱晋辉','(空)','2026-08-26 13:51:11'],
+  ],
+  assetsCert: [],
+  portService: [
+    ['172.17.9.37','根组织机构','22','TCP','ssh','(空)','(空)','手动添加','未设置','0'],
+  ],
+  fingerprint: [],
+  software: [
+    ['mysql','(空)','linux-server-04','192.168.1.13','青藤测试','Admin','(空)','agent04xxxxxxxx','2026-08-25 10:54:41','手动添加'],
+    ['log4j-core','2.14.1','app-server-01','172.17.9.37','根组织机构','Admin','/app/lib','agent01xxxxxxxx','2026-10-15 09:20:11','手动添加'],
+    ['redis','6.2.5','cache-server-01','192.168.2.10','根组织机构','Admin','/usr/local/redis','agent06xxxxxxxx','2026-10-15 09:22:30','手动添加'],
+    ['httpd','2.4.49','web-server-02','172.16.1.2','某部门','柯李木_5mKC','/usr/local/apache2','agent02xxxxxxxx','2026-10-15 09:25:04','手动添加'],
+    ['openssh','7.6p1','gw-server-01','10.0.0.1','根组织机构','Admin','/usr/sbin','agent10xxxxxxxx','2026-10-15 09:26:40','手动添加'],
+  ],
+  assetTags: [
+    ['monitor1','开启','刘昂威','(空)','2026-09-18 11:22:06'],
+    ['例子','开启','王亚坤','(空)','2026-08-31 14:10:50'],
+    ['测试','关闭','系统','(空)','2026-08-11 12:20:33'],
+    ['test','关闭','王鸿杰','(空)','2026-06-06 15:07:04'],
+    ['monitor','开启','赵强_RcO6','123','2026-06-08 10:33:08'],
+    ['Windows服务器','关闭','系统','(空)','2026-05-22 13:13:20'],
+    ['核心系统','关闭','系统','(空)','2026-05-22 13:13:17'],
+    ['Linux服务器','关闭','系统','(空)','2026-05-22 13:13:17'],
+  ],
+  business: [
+    ['myj','(空)','0','0','是','分支部门A','无风险','宁小多','0000','重要系统'],
+  ],
+  tasks: [
+    ['jjj','洞鉴01','李升明','根组织机构','生产网段','手动执行','否','未启动','(空)','2026-09-16 19:06:10'],
+  ],
+  scanDevices: [
+    ['1','(空)','Admin','根组织机构','默认域','离线','(空)','(空)'],
+  ],
+  images: [
+    ['ldap-sync','v2','','2026-09-17 16:49:14'],
+    ['洞鉴','260629-86c','app_version: 260629-86c / device: xray / device_name: 洞鉴 / vendor: chaitin','2026-06-29 16:25:07'],
+    ['Nessus','20260512-737','app_version: 20260512-737 / device: Nessus / device_name: Nessus / vendor: Tenable','2026-05-12 14:46:02'],
+  ],
+  exposureTasks: [
+    ['test','完成','6','tester','2026-10-09 09:14:54','2026-10-09 09:16:04','(空)'],
+  ],
+  baselines: [],
+  datafields: [
+    ['test','根组织机构','是','test.com','2026-10-08 20:24:18'],
+  ],
+  logs: [
+    ['2026-10-20 08:42:38','tester','leader','101.200.128.140','登录系统','成功'],
+  ],
+  orders: { doing: 92, done: 162 },
+  mineTabs: { '待处理': 0, '我创建': 4, '抄送我': 0, '已处理': 1 },
+  reportDownloads: [],
+  reportFiles: [
+    ['test','(空)','(空)','根组织机构','胡本琦','2026-10-09 12:31:02'],
+  ],
+  tickets: [],   // 采纳建议/详情建工单产生的工单（渲染到 工单中心-全部工单）
+  docker: [
+    ['ldap-sync-35a0b1cd67','ldap-sync:v2','restarting','','停止、删除'],
+  ],
+  dashboard: {
+    asset: { total: 134, host: 127, web: 4, domain: 3, managed: 57, unmanaged: 77, history: 2, excluded: 2 },
+    vulnStatus: { total: 609, '待处理': 533, '修复中': 1, '已修复': 6, '确认中': 66, '待复测': 1, '忽略/误报': 2 },
+    trends: [
+      { title: '新增漏洞数（本周）', num: 2, cmp: '200.00' },
+      { title: '待修复漏洞数', num: 601, cmp: '60,100.00' },
+      { title: '闭环漏洞数', num: 8, cmp: '800.00' },
+    ],
+    levelDist: [   // 漏洞等级分布（比例%）
+      { level: '超危', pct: 24.47 }, { level: '高危', pct: 36.62 }, { level: '中危', pct: 24.3 },
+      { level: '低危', pct: 14.61 }, { level: '信息', pct: 0 },
+    ],
+    repair: { rate: '0.99%', total: 609, fixed: 6 },
+    top5: [ ['根组织机构', 352], ['青藤测试', 33], ['财务部', 25], ['运营部', 20], ['人力资源部', 18] ],
+    vulnTypes: [
+      ['后门漏洞',6],['命令执行漏洞',78],['命令注入漏洞',18],['CSRF漏洞',2],['反序列化漏洞',5],['路径遍历漏洞',4],
+      ['拒绝服务漏洞',6],['文件包含漏洞',2],['文件上传漏洞',32],['文件读取漏洞',2],['任意文件删除',2],['弱口令漏洞',5],
+      ['敏感信息泄露漏洞',28],['LDAP注入漏洞',6],['任意消息披露漏洞',16],['逻辑漏洞',9],['内存信息泄露漏洞',4],['其他',157],
+      ['越权访问漏洞',4],['条件竞争漏洞',3],['应用程序测试漏洞',2],['文件下载漏洞',79],['SQL注入漏洞',2],['SSRF漏洞',7],
+      ['未授权访问漏洞',70],['格式化字符串漏洞',3],['栈创越界漏洞',8],['不安全的认证授权',4],['XML外部实体注入',40],
+      ['释放后重用漏洞',2],['暗链漏洞',1],['XSS漏洞',36],['XSRF漏洞',2],['自动补全空口令漏洞',6],['会话固定漏洞',31],
+      ['重放攻击漏洞',3],['点击劫持漏洞',2],['默认口令漏洞',13],['默认配置漏洞',5],['组件技术信息泄露',1],['代码注入漏洞',2],
+      ['未授权绕过认证',2],
+    ],
+  },
+  // VPT 配置（标准规则 + 等级映射）
+  vptConfig: {
+    weights: { asset: 0, vuln: 100, intel: 0 },
+    assetProps: {
+      internet: { weight: 0, vals: { '是': 100, '否': 50 } },
+      importance: { weight: 100, vals: { '核心资产': 100, '重要资产': 70, '一般资产': 20 } },
+      tags: { weight: 0, defaultVal: 0 },
+    },
+    vulnProps: {
+      level: { weight: 100, vals: { '超危': 100, '高危': 80, '中危': 50, '低危': 10, '默认': 0 } },
+      type: { weight: 0, defaultVal: 50 },
+      tags: { weight: 0, defaultVal: 0 },
+      kbTags: { weight: 0, defaultVal: 0 },
+      customTags: { weight: 0, defaultVal: 0 },
+    },
+    intelProps: {
+      exp: { weight: 50, vals: { '有': 100, '无': 0 } },
+      patch: { weight: 50, vals: { '有': 0, '无': 100 } },
+      wild: { weight: 0, vals: { '有': 100, '无': 0 } },
+      exploitWay: { weight: 0, vals: { '远程利用': 100, '内网利用': 50, '本地利用': 30, '物理利用': 10 } },
+      complexity: { weight: 0, vals: { '简单': 100, '中等': 50, '复杂': 20 } },
+    },
+    specialRules: [
+      { score: 81, conds: [ ['是否外网资产', '等于', '外网资产'], ['漏洞等级', '等于', '高危'] ] },
+      { score: 75, conds: [ ['是否外网资产', '等于', '外网资产'], ['漏洞等级', '等于', '中危'] ] },
+      { score: 50, conds: [ ['是否外网资产', '等于', '外网资产'], ['漏洞等级', '等于', '低危'] ] },
+    ],
+    sortRules: [
+      { score: 5, conds: [ ['资产重要性', '包含', '重要资产、核心资产'], ['有无EXP', '等于', '有'] ] },
+      { score: 5, conds: [ ['资产重要性', '包含', '重要资产、核心资产'], ['有无EXP', '等于', '有'] ] },
+    ],
+  },
+  orgTree: ['根组织机构', '青藤测试', '财务部', '运营部', '人力资源部', '开发中心', '运维中心', '分公司A', '分支部门A', '某部门'],
+};
+// 状态 Tab 计数：按实际数据实时统计（顺序与列表 Tab 一致），保证计数、列表、分页三者对称
+const VULN_STATUS_ORDER = ['待处理', '确认中', '修复中', '待复测', '已修复', '误报', '忽略'];
+function vulnCounts(list) {
+  const m = { 全部: list.length };
+  VULN_STATUS_ORDER.forEach(s => { m[s] = list.filter(v => v.status === s).length; });
+  return m;
+}
+DB.vulnsIpCounts = vulnCounts(DB.vulnsIp);
+DB.vulnsWebCounts = vulnCounts(DB.vulnsWeb);
+
+/* ================================================================
+ * 四、本地动作实现（Agent 未接管时的默认行为）
+ * ================================================================ */
+/** 工单落库：写入工单中心数据 + 审计日志（本地模式由 LocalActions 调用） */
+function _recordTicket(kind, id, ticketId, from) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+  const v = list.find(x => String(x.id) === String(id));
+  DB.tickets.unshift([ts, (v ? v.name : '漏洞ID ' + id) + '（ID ' + id + '）', 'tester', '提交修复建议', '进行中', v && v.planFix ? String(v.planFix).slice(0, 10) : '-', ticketId, '']);
+  DB.logs.unshift([ts, 'tester', 'leader', '127.0.0.1', (from === 'fix-advisor' ? '修复建议助手' : '漏洞详情') + '：采纳建议并创建修复工单（漏洞ID ' + id + '，工单 ' + ticketId + '）', '成功']);
+}
+
+window.LocalActions = {
+  async getDashboardStats() { return { ok: true, data: DB.dashboard }; },
+  async queryVulns({ kind = 'ip', tab = '全部', keyword = '', level = '' } = {}) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    let rows = list.filter(v => (tab === '全部' ? true : v.status === tab));
+    if (keyword) rows = rows.filter(v => v.name.includes(keyword));
+    if (level) rows = rows.filter(v => v.level === level);
+    return { ok: true, data: rows };
+  },
+  async getVuln({ kind = 'ip', id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    return v ? { ok: true, data: v } : { ok: false, error: '漏洞不存在' };
+  },
+  async updateVuln({ kind = 'ip', id, patch }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    Object.assign(v, patch);
+    return { ok: true, data: v };
+  },
+  async setVulnStatus({ kind = 'ip', id, status }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    v.status = status;
+    return { ok: true, data: v };
+  },
+  async getVptConfig() { return { ok: true, data: DB.vptConfig }; },
+  async updateVptConfig({ patch }) { Object.assign(DB.vptConfig, patch); return { ok: true, data: DB.vptConfig }; },
+  /** 工具动作：VPT 归因（功能一评判链第 2 步，读取类） */
+  async getVptAttribution({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const c = calcVptScore(v);
+    const w = DB.vptConfig.weights;
+    return { ok: true, data: {
+      score: c.score, key: vptKeyOf(c.score), byRule: c.byRule, level: v.level,
+      levelScore: LEVEL_SCORE[v.level] ?? 0,
+      weights: { asset: w.asset, vuln: w.vuln, intel: w.intel },
+      explain: (c.byRule ? '分值来自特殊评分规则直接赋值' : '分值来自漏洞属性加权：等级「' + v.level + '」基础分 ' + (LEVEL_SCORE[v.level] ?? 0) + ' × 权重 100%'),
+    } };
+  },
+  /** 工具动作：知识库 / 情报库检索（功能一评判链第 3 步） */
+  async searchKnowledge({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const kb = DB.knowledge.filter(k => (v.cve && v.cve !== '(空)' && k[3] === v.cve) || k[0] === v.name);
+    const intel = DB.intel.filter(k => (v.cve && v.cve !== '(空)' && k[2] === v.cve) || k[0] === v.name);
+    return { ok: true, data: {
+      count: kb.length + intel.length,
+      kb: kb.map(k => ({ name: k[0], cve: k[3], level: k[1] })),
+      intel: intel.map(k => ({ name: k[0], cve: k[2], level: k[1] })),
+    } };
+  },
+  /** 工具动作：处置记录时间线（功能一评判链第 4 步） */
+  async getDisposalRecords({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const records = [
+      ['2026-07-12 15:23:07', 'admin', '待处理'],
+      ['2026-07-12 15:22:39', 'admin', '已修复'],
+      ['2026-06-26 00:42:38', 'sso.zhiqiang.zhao', '已修复（厂商补丁false 人工-1）'],
+      ['2026-05-09 10:41:42', '', '新增漏洞（待处理）'],
+    ];
+    return { ok: true, data: { count: records.length, records } };
+  },
+  /** 功能三：修复建议本地化（agent 终点动作，真实部署时由 register() 接管为大模型调用） */
+  async generateFixAdvice({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const asset = DB.assetsIp.find(a => a[0] === v.asset) || null;
+    const managed = !!asset;
+    const software = DB.software.filter(s => s[3] === v.asset);
+    const kb = DB.knowledge.find(k => (v.cve && v.cve !== '(空)' && k[3] === v.cve) || k[0] === v.name);
+    const sameClosed = list.filter(x => x.cve && x.cve === v.cve && x.status === '已修复' && String(x.id) !== String(id));
+    const data = {
+      vuln: { name: v.name, level: v.level, vpt: v.vpt, type: v.type, cve: v.cve, asset: v.asset, source: v.source },
+      assets: asset
+        ? [{ ip: asset[0], name: asset[1], org: asset[2], owner: asset[7], biz: '（平台未关联业务系统）', from: '资产台账 · 资产IP=' + asset[0] }]
+        : [{ ip: v.asset, name: v.assetName, org: v.org, owner: v.owner, biz: v.biz, from: '漏洞详情 · 影响资产/负责人字段' }],
+      managed,
+      versionKnown: software.length > 0,
+      versionText: software.map(s => s[0] + (s[1] && s[1] !== '(空)' ? '（版本 ' + s[1] + '）' : '（版本未采集）')).join('、'),
+      kbFound: !!kb,
+      kbText: kb ? kb[0] + '（' + kb[3] + '，' + kb[1] + '）' : '',
+      sameClosed,
+      officialFix: v.fix,
+      coord: { owner: v.owner, coOwner: v.coOwner, biz: v.biz, assetOwner: asset ? asset[7] : v.owner },
+      confidence: managed && software.length ? '较高' : (managed ? '中' : '中（该资产未纳管，组件版本信息缺失，建议先纳管采集）'),
+      confLevel: managed && software.length ? 'high' : 'mid',
+      unknowns: [
+        ...(managed ? [] : ['平台资产台账中未收录 ' + v.asset + '（未纳管），无法确认该资产当前运行的组件与版本，无法判断升级是否需要停机。']),
+        ...(software.length ? [] : managed ? ['资产已纳管但软件台账中未采集到组件版本信息。'] : []),
+        ...(kb ? [] : ['知识库（demo 抽样数据）未命中同 CVE/同名条目，无法补充官方通告细节。']),
+      ],
+    };
+    return { ok: true, data };
+  },
+  /** 工具动作：资产档案（修复建议助手链第 4 步） */
+  async getAssetProfile({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const asset = DB.assetsIp.find(a => a[0] === v.asset) || null;
+    return { ok: true, data: asset
+      ? { ip: asset[0], name: asset[1], org: asset[2], owner: asset[7], biz: '（平台未关联业务系统）', managed: true }
+      : { ip: v.asset, name: v.assetName, org: v.org, owner: v.owner, biz: v.biz, managed: false } };
+  },
+  /** 功能一：漏洞研判摘要（读取类，自动执行）。事实全部来自平台结构化数据，模型只组织语言，逐条带引用 */
+  async generateJudgement({ kind, id }) {
+    const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+    const v = list.find(x => String(x.id) === String(id));
+    if (!v) return { ok: false, error: '漏洞不存在' };
+    const c = calcVptScore(v);
+    const w = DB.vptConfig.weights;
+    const intelMissing = v.exp === '无' && v.poc === '无' && v.patch === '无' && v.wild === '否';
+    const asset = DB.assetsIp.find(a => a[0] === v.asset) || null;
+    const kbHits = DB.knowledge.filter(k => (v.cve && v.cve !== '(空)' && k[3] === v.cve) || k[0] === v.name);
+    const sameClosed = list.filter(x => x.cve && x.cve === v.cve && x.status === '已修复' && String(x.id) !== String(id));
+    const citations = [
+      { label: 'VPT 归因', from: '配置中心 VPT 规则（透明可配置）', detail: (c.byRule ? '特殊评分规则直接赋分' : '漏洞属性加权：等级「' + v.level + '」基础分 ' + (LEVEL_SCORE[v.level] ?? 0) + ' × 权重 100%') + '；属性占比 资产' + w.asset + '% / 漏洞' + w.vuln + '% / 情报' + w.intel + '%' },
+      { label: '情报信息', from: '漏洞详情 · 情报信息字段', detail: '有无EXP ' + v.exp + ' · 有无POC ' + v.poc + ' · 补丁发布 ' + v.patch + ' · 在野利用 ' + v.wild },
+      { label: '资产档案', from: asset ? '资产台账 · 资产IP=' + asset[0] : '漏洞详情 · 影响资产字段', detail: asset ? (asset[0] + '（' + asset[1] + '），责任人 ' + asset[7] + '，资产风险 ' + asset[6]) : (v.asset + '（' + v.assetName + '），责任人 ' + v.owner + '，未纳管') },
+      ...(kbHits.length ? [{ label: '知识库命中', from: '漏洞知识库', detail: kbHits.map(k => k[0] + '（' + k[3] + '，' + k[1] + '）').join('；') }] : []),
+      ...(sameClosed.length ? [{ label: '同源处置', from: '同 CVE 已修复记录', detail: sameClosed.length + ' 条：' + sameClosed.slice(0, 3).map(x => x.asset).join('、') }] : []),
+    ];
+    const unknowns = [];
+    if (!asset) unknowns.push('资产 ' + v.asset + ' 未纳管，无法确认当前运行的组件与版本，无法判断升级是否需要停机。');
+    else if (!DB.software.some(s => s[3] === v.asset)) unknowns.push('资产已纳管但软件台账未采集组件版本信息。');
+    if (!kbHits.length) unknowns.push('知识库（demo 抽样）未命中同源条目，官方通告细节需人工补充。');
+    const summary = [
+      'VPT ' + c.score + ' 分（' + vptKeyOf(c.score) + '）的来源：' + (c.byRule ? '特殊评分规则命中直接赋值。' : '漏洞属性加权，等级「' + v.level + '」基础分 ' + (LEVEL_SCORE[v.level] ?? 0) + ' × 权重 100%。'),
+      intelMissing ? '情报四项全部为空，分数未经情报维度校准——评分依据需要核实。' : '情报维度已有字段可校准评分。',
+      '当前处置：' + v.status + '，负责人 ' + v.owner + ' / ' + v.coOwner + '，业务系统 ' + v.biz + '。' + (asset ? '资产已纳管，修复落实可追踪。' : '资产未纳管，落实无法追踪，建议先完成纳管。'),
+      sameClosed.length ? '平台已有 ' + sameClosed.length + ' 条同 CVE 漏洞完成处置，可参考其处置方式。' : '',
+    ].filter(Boolean).join('');
+    return { ok: true, data: {
+      vuln: { id: v.id, name: v.name, level: v.level, vpt: v.vpt, type: v.type, cve: v.cve, asset: v.asset, status: v.status },
+      attribution: { score: c.score, key: vptKeyOf(c.score), byRule: c.byRule },
+      summary, citations, unknowns,
+      confidence: { level: asset ? 'high' : 'mid', text: asset ? '较高' : '中（资产未纳管，版本信息缺失）' },
+    } };
+  },
+  /** 采纳建议：状态变更动作 —— 建工单 + 落审计日志（真实部署时 register() 接管为真实工单接口） */
+  async adoptFixAdvice({ kind, id }) {
+    const ticketId = 'MOCK-' + Date.now().toString().slice(-6);
+    _recordTicket(kind, id, ticketId, 'fix-advisor');
+    return { ok: true, data: { ticketId } };
+  },
+  async createTicket({ vulnId, from }) {
+    const ticketId = 'MOCK-' + Date.now().toString().slice(-6);
+    _recordTicket('ip', vulnId, ticketId, from || 'detail');
+    return { ok: true, data: { ticketId } };
+  },
+};
+
+/** 依据 VPT 标准规则本地计算综合分与 P 级（复刻原版评级口径） */
+function calcVptScore(vuln, cfg = DB.vptConfig) {
+  const w = cfg.weights, vp = cfg.vulnProps, ap = cfg.assetProps, ip = cfg.intelProps;
+  // 资产属性得分（demo 数据未建模完整资产属性，按默认值兜底）
+  let assetScore = 0;
+  let wsum = Number(ap.importance.weight) + Number(ap.internet.weight) + Number(ap.tags.weight);
+  if (wsum > 0) {
+    let s = 0;
+    s += Number(ap.importance.weight) * Number(ap.importance.vals['一般资产'] || 0);
+    s += Number(ap.internet.weight) * Number(ap.internet.vals['否'] || 0);
+    s += Number(ap.tags.weight) * Number(ap.tags.defaultVal || 0);
+    assetScore = s / (wsum || 1);
+  }
+  // 漏洞属性得分
+  let vulnScore = 0; let vw = Number(vp.level.weight) + Number(vp.type.weight) + Number(vp.tags.weight) + Number(vp.kbTags.weight) + Number(vp.customTags.weight);
+  if (vw > 0) {
+    let s = 0;
+    s += Number(vp.level.weight) * Number(LEVEL_SCORE[vuln.level] ?? 0);
+    s += Number(vp.type.weight) * Number(vp.type.defaultVal || 0);
+    s += Number(vp.tags.weight) * Number(vp.tags.defaultVal || 0);
+    s += Number(vp.kbTags.weight) * Number(vp.kbTags.defaultVal || 0);
+    s += Number(vp.customTags.weight) * Number(vp.customTags.defaultVal || 0);
+    vulnScore = s / (vw || 1);
+  }
+  // 情报属性得分
+  let intelScore = 0; let iw = Number(ip.exp.weight) + Number(ip.patch.weight) + Number(ip.wild.weight) + Number(ip.exploitWay.weight) + Number(ip.complexity.weight);
+  if (iw > 0) {
+    let s = 0;
+    s += Number(ip.exp.weight) * Number(ip.exp.vals['无'] || 0);
+    s += Number(ip.patch.weight) * Number(ip.patch.vals['无'] || 0);
+    s += Number(ip.wild.weight) * Number(ip.wild.vals['无'] || 0);
+    s += Number(ip.exploitWay.weight) * Number(ip.exploitWay.vals['远程利用'] || 0);
+    s += Number(ip.complexity.weight) * Number(ip.complexity.vals['简单'] || 0);
+    intelScore = s / (iw || 1);
+  }
+  const total = Number(w.asset) / 100 * assetScore + Number(w.vuln) / 100 * vulnScore + Number(w.intel) / 100 * intelScore;
+  // 特殊评分规则命中（优先于常规计分）
+  for (const rule of cfg.specialRules) {
+    const hit = rule.conds.every(c => {
+      const [f, , val] = c;
+      if (f === '漏洞等级') return vuln.level === val;
+      if (f === '是否外网资产') return val === '外网资产'; // demo 未建模，仅示意
+      return false;
+    });
+    if (hit) return { score: Number(rule.score), byRule: true };
+  }
+  return { score: Math.round(total * 100) / 100, byRule: false };
+}
+function vptKeyOf(score) {
+  if (score > 80) return 'P0';
+  if (score > 74) return 'P1';
+  if (score > 49) return 'P2';
+  if (score > 0) return 'P3';
+  return 'P4';
+}
+
+/* ================================================================
+ * 五、通用 UI 工具
+ * ================================================================ */
+const $content = document.getElementById('content');
+const $menu = document.getElementById('menu');
+const $modalRoot = document.getElementById('modal-root');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tag = (t, cls) => `<span class="tag ${cls}">${esc(t)}</span>`;
+const levelTag = t => tag(t, LEVEL_CLS[t] || 'tag-plain');
+const riskTag = t => tag(t, t === '高风险' ? 'tag-risk-high' : t === '中风险' ? 'tag-risk-mid' : t === '无风险' ? 'tag-risk-none' : 'tag-plain');
+const vptSpan = p => `<span class="tag tag-vpt ${'vpt-p' + p.slice(1)}">${esc(p)}</span>`;
+
+let msgTimer = null;
+function toast(text, type = 'success') {
+  document.querySelectorAll('.message').forEach(m => m.remove());
+  const el = document.createElement('div');
+  el.className = 'message ' + type;
+  el.textContent = text;
+  document.body.appendChild(el);
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => el.remove(), 2200);
+}
+
+const ICONS = {
+  eye: '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6s2-3.4 5-3.4S11 6 11 6s-2 3.4-5 3.4S1 6 1 6z" fill="none" stroke="currentColor"/><circle cx="6" cy="6" r="1.6" fill="currentColor"/></svg>',
+  edit: '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M8.2 1.6l2.2 2.2-6 6-2.8.6.6-2.8 6-6z" fill="none" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  trash: '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 3.5h8M4.5 3.5V2h3v1.5M3 3.5l.5 7h5l.5-7" fill="none" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  mail: '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="2.5" width="10" height="7" rx="1" fill="none" stroke="currentColor"/><path d="M1.5 3.5L6 7l4.5-3.5" fill="none" stroke="currentColor"/></svg>',
+  link: '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M5 7l2-2M4.5 8.5l-1.6 1.6a1.8 1.8 0 0 1-2.5-2.5L2 6M7.5 3.5l1.6-1.6a1.8 1.8 0 0 1 2.5 2.5L10 6" fill="none" stroke="currentColor" stroke-linecap="round"/></svg>',
+  wrench: '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M9.8 3.4a2.6 2.6 0 0 1-3.5 3.1L3 9.8a1.1 1.1 0 0 1-1.6-1.6l3.3-3.3a2.6 2.6 0 0 1 3.1-3.5L6.4 2.8l1.6 1.6 1.8-1z" fill="none" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  refresh: '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M11 6.5A4.5 4.5 0 1 1 6.5 2c1.8 0 3.2.9 4 2.3M10.5 1.5v3h-3" fill="none" stroke="currentColor" stroke-linecap="round"/></svg>',
+  setting: '<svg width="13" height="13" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="2" fill="none" stroke="currentColor"/><path d="M6.5 1v1.6M6.5 10.4V12M1 6.5h1.6M10.4 6.5H12M2.6 2.6l1.1 1.1M9.3 9.3l1.1 1.1M10.4 2.6L9.3 3.7M3.7 9.3l-1.1 1.1" stroke="currentColor" stroke-linecap="round"/></svg>',
+};
+
+/* ================================================================
+ * 六、侧边栏菜单
+ * ================================================================ */
+const MENU = [
+  { key: 'visual', title: '可视化', icon: 'bar',
+    children: [
+      { title: '可视化仪表盘', route: '#/dashboard' },
+      { title: '工单运营报表', route: '#/ticket-stats' },
+    ] },
+  { key: 'assets', title: '资产中心', icon: 'shield',
+    children: [
+      { title: '资产管理', children: [
+        { title: '主机资产', route: '#/assets/ip' },
+        { title: 'Web 资产', route: '#/assets/web' },
+        { title: '主域名资产', route: '#/assets/domain' },
+        { title: '子域名资产', route: '#/assets/subdomain' },
+        { title: 'API资产', route: '#/assets/api' },
+        { title: '证书资产', route: '#/assets/certificate' },
+      ] },
+      { title: '资产暴露面', children: [
+        { title: '端口服务', route: '#/expose/port' },
+        { title: '网站指纹', route: '#/expose/fingerprint' },
+      ] },
+      { title: '主机软件', route: '#/assets/software' },
+      { title: '资产标签', route: '#/assets/tags' },
+      { title: '业务系统', route: '#/business' },
+    ] },
+  { key: 'risk', title: '风险管理', icon: 'shield2',
+    children: [
+      { title: '漏洞列表', children: [
+        { title: 'IP 漏洞', route: '#/vulns/ip' },
+        { title: 'Web 漏洞', route: '#/vulns/web' },
+      ] },
+      { title: '漏洞标签', route: '#/vulns/tags' },
+      { title: '漏洞知识库', route: '#/knowledge' },
+      { title: '漏洞情报库', route: '#/customKb' },
+      { title: '风险排查', route: '#/exposure' },
+      { title: '基线风险', route: '#/baseline' },
+    ] },
+  { key: 'detect', title: '检测管理', icon: 'clock',
+    children: [
+      { title: '任务列表', route: '#/task/list' },
+      { title: '接入列表', route: '#/task/scanList' },
+      { title: '镜像管理', route: '#/task/imageList' },
+    ] },
+  { key: 'workflow', title: '工单中心', icon: 'doc',
+    children: [
+      { title: '全部工单', route: '#/workflow/orders' },
+      { title: '我的工单', route: '#/workflow/mine' },
+    ] },
+  { key: 'report', title: '报告中心', icon: 'book',
+    children: [
+      { title: '报告下载', route: '#/report/downloads' },
+      { title: '报告资料', route: '#/report/filelist' },
+    ] },
+  { key: 'config', title: '配置中心', icon: 'sliders',
+    children: [
+      { title: 'VPT', route: '#/vpt' },
+      { title: '大模型配置', route: '#/llm-config' },
+      { title: '用户管理', route: '#/users' },
+      { title: '可视化配置', route: '#/visual-config' },
+      { title: '数据管理', route: '#/datafields' },
+      { title: '通知管理', route: '#/notify' },
+      { title: '日志管理', route: '#/logging' },
+      { title: '容器监控', route: '#/docker-ui' },
+    ] },
+];
+
+const MENU_ICONS = {
+  bar: '<svg width="15" height="15" viewBox="0 0 15 15"><rect x="2" y="7" width="2.4" height="6" rx=".5" fill="currentColor"/><rect x="6.3" y="3" width="2.4" height="10" rx=".5" fill="currentColor"/><rect x="10.6" y="5.5" width="2.4" height="7.5" rx=".5" fill="currentColor"/></svg>',
+  shield: '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M7.5 1.5l5 2.6v4.4c0 3.3-2.2 5.7-5 6.5-2.8-.8-5-3.2-5-6.5V4.1l5-2.6z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="7.5" cy="7" r="1.7" fill="currentColor"/></svg>',
+  shield2: '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M7.5 1.5l5 2.6v4.4c0 3.3-2.2 5.7-5 6.5-2.8-.8-5-3.2-5-6.5V4.1l5-2.6z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.4 7.4l1.4 1.4 2.6-2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  clock: '<svg width="15" height="15" viewBox="0 0 15 15"><circle cx="7.5" cy="7.5" r="5.7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 4.4v3.1l2 1.3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  doc: '<svg width="15" height="15" viewBox="0 0 15 15"><rect x="2.5" y="2" width="10" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5 5.5h5M5 8h5M5 10.5h3" stroke="currentColor" stroke-width="1"/></svg>',
+  book: '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M2 3a1 1 0 0 1 1-1h9.5v10H3a1 1 0 0 0-1 1V3z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2 13a1 1 0 0 1 1-1h9.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+  sliders: '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M2 4h11M2 7.5h11M2 11h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="5.5" cy="4" r="1.4" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="9.5" cy="7.5" r="1.4" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="11" r="1.4" fill="#fff" stroke="currentColor" stroke-width="1.2"/></svg>',
+};
+
+function renderMenu(activeRoute) {
+  const findRoot = (items) => {
+    for (const it of items) {
+      if (it.route === activeRoute) return [it];
+      if (it.children) {
+        const sub = findRoot(it.children);
+        if (sub && sub.length) return [it, ...sub];
+      }
+    }
+    return null;
+  };
+  const path = findRoot(MENU) || [];
+  const pathSet = new Set(path);
+
+  const html = (items, level) => items.map(it => {
+    if (it.children) {
+      const open = pathSet.has(it) ? ' open' : '';
+      const activeRoot = pathSet.has(it) && path[0] !== it ? '' : (path[0] === it && path.length > 1 ? ' active-root' : '');
+      return `<div class="menu-item${open}${activeRoot}" data-menu-key="${esc(it.title)}">
+        <div class="menu-item-title">
+          <span class="mi-icon">${it.icon ? MENU_ICONS[it.icon] : ''}</span>
+          <span class="mi-text">${esc(it.title)}</span>
+          <svg class="mi-arrow" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="submenu">${html(it.children, level + 1)}</div>
+      </div>`;
+    }
+    const active = it.route === activeRoute ? ' active' : '';
+    return `<div class="menu-item menu-leaf${active}" data-route="${esc(it.route)}">
+      <div class="menu-item-title">
+        <span class="mi-icon"></span>
+        <span class="mi-text">${esc(it.title)}</span>
+      </div>
+    </div>`;
+  }).join('');
+  $menu.innerHTML = html(MENU, 0);
+
+  $menu.querySelectorAll('.menu-leaf').forEach(el => {
+    el.addEventListener('click', () => { location.hash = el.dataset.route; });
+  });
+  $menu.querySelectorAll('.menu-item > .menu-item-title').forEach(titleEl => {
+    const parent = titleEl.parentElement;
+    if (parent.classList.contains('menu-leaf')) return;
+    titleEl.addEventListener('click', (e) => {
+      // 组节点点击：切换展开；若同时是本组路由父级，仍只展开收起
+      if (parent.classList.contains('open') && !parent.dataset.openedOnce) {
+        parent.dataset.openedOnce = '1';
+        return; // 首次因 active 自动展开，点击视为误触切换 protection
+      }
+      parent.classList.toggle('open');
+    });
+  });
+}
+
+/* ================================================================
+ * 七、路由
+ * ================================================================ */
+const ROUTES = {
+  '#/dashboard': renderDashboard,
+  '#/ticket-stats': renderTicketStats,
+  '#/assets/ip': () => renderListPage('ip'),
+  '#/assets/web': () => renderListPage('web'),
+  '#/assets/domain': () => renderListPage('domain'),
+  '#/assets/subdomain': () => renderListPage('subdomain'),
+  '#/assets/api': () => renderListPage('api'),
+  '#/assets/certificate': () => renderListPage('certificate'),
+  '#/expose/port': () => renderListPage('port'),
+  '#/expose/fingerprint': () => renderListPage('fingerprint'),
+  '#/assets/software': () => renderListPage('software'),
+  '#/assets/tags': () => renderListPage('assetTags'),
+  '#/business': () => renderListPage('business'),
+  '#/vulns/ip': () => renderVulList('ip'),
+  '#/vulns/web': () => renderVulList('web'),
+  '#/vulns/tags': () => renderListPage('vulTags'),
+  '#/knowledge': () => renderListPage('knowledge'),
+  '#/customKb': () => renderListPage('intel'),
+  '#/exposure': () => renderListPage('exposure'),
+  '#/baseline': () => renderListPage('baseline'),
+  '#/task/list': () => renderListPage('tasks'),
+  '#/task/scanList': () => renderListPage('scanDevices'),
+  '#/task/imageList': () => renderListPage('images'),
+  '#/workflow/orders': () => renderOrders('orders', 0),
+  '#/workflow/mine': () => renderOrders('mine', 0),
+  '#/report/downloads': () => renderListPage('reportDownloads'),
+  '#/report/filelist': () => renderListPage('reportFiles'),
+  '#/vpt': renderVptPage,
+  '#/llm-config': () => renderLlmConfig(),
+  '#/datafields': () => renderListPage('datafields'),
+  '#/logging': () => renderListPage('logs'),
+  '#/docker-ui': () => renderListPage('docker'),
+  '#/users': () => renderSimplePage('用户管理', '当前账号无权限查看该页面（原版提示：权限不足）'),
+  '#/notify': () => renderSimplePage('通知管理', '通知配置（webhook / 邮件 / 钉钉等，原版页面）'),
+  '#/visual-config': () => renderSimplePage('可视化配置', '仪表盘展示配置（原版页面）'),
+};
+function router() {
+  closeFixAssistant();   // 切换页面时自动关闭助手抽屉与遮罩
+  const hash = location.hash || '#/dashboard';
+  // 漏洞详情：#/vulns/ip?id=228
+  const m = hash.match(/^#\/vulns\/(ip|web)\?(.*)$/);
+  if (m) { renderVulDetail(m[1], m[2]); renderMenu('#/vulns/' + m[1]); return; }
+  const fn = ROUTES[hash] || renderDashboard;
+  renderMenu(hash);
+  fn();
+}
+window.addEventListener('hashchange', router);
+document.getElementById('home-btn').addEventListener('click', () => { location.hash = '#/dashboard'; });
+document.getElementById('collapse-btn').addEventListener('click', () => {
+  document.getElementById('layout').classList.toggle('collapsed');
+});
+
+/* ================================================================
+ * 八、页面渲染
+ * ================================================================ */
+function renderSimplePage(title, desc) {
+  $content.innerHTML = `<div class="card"><div class="card-title">${esc(title)}</div><div class="text-secondary">${esc(desc)}</div></div>`;
+}
+
+/* ---------- 大模型配置（AI 助手接入 · 面向分析师的在线配置页）----------
+ * 类似 Agent 工具的「模型设置」页：分析师无需接触后端代码，
+ * 直接填入接入地址 / Key / 模型名，保存即替换服务端默认配置；
+ * 不填写时自动回落到服务端内置 Key（环境变量 / 程序默认）。
+ * 后端接口：GET/PUT /api/llm-config（Key 永不回显明文）、
+ *           POST /api/llm-config/test（可用未保存的输入直接测试）。 */
+async function renderLlmConfig() {
+  const isRemote = AgentBridge.getConfig().mode === 'remote';
+  if (!isRemote) {
+    $content.innerHTML = `<div class="card"><div class="card-title">大模型配置</div>
+      <div class="llm-hint">当前前端为「本地模拟」模式，大模型接入由远程后端管理。<br>
+      请先启动后端：<code>python backend.py</code>，再点击下方按钮连接（推荐直接访问
+      <code>http://127.0.0.1:8000/insight-replica.html</code>，即为同源远程模式）。</div>
+      <div style="margin-top:12px"><button class="btn btn-primary" id="llm-goremote">连接本地后端并配置</button></div></div>`;
+    document.getElementById('llm-goremote').addEventListener('click', () => {
+      AgentBridge.configure({ mode: 'remote', baseUrl: 'http://127.0.0.1:8000' });
+      toast('已切换到远程模式（http://127.0.0.1:8000）');
+      renderLlmConfig();
+    });
+    return;
+  }
+  $content.innerHTML = `<div class="card" style="max-width:760px">
+    <div class="card-title">大模型配置</div>
+    <div class="llm-status-line" id="llm-status">加载中…</div>
+    <div class="llm-hint" id="llm-source" style="margin:2px 0 0 16px"></div>
+
+    <div class="form-section">填入你的大模型接入信息
+      <span class="llm-hint">（保存后立即替换服务端默认配置；不填则继续使用服务端内置 Key）</span></div>
+    <div class="form-item" style="margin-bottom:10px"><label>接入地址</label><input class="input" id="llm-baseurl" placeholder="https://api.deepseek.com"/><span class="llm-field-hint">OpenAI 兼容服务的地址</span></div>
+    <div class="form-item" style="margin-bottom:10px"><label>API Key</label><input class="input" id="llm-apikey" type="password" placeholder=""/><span class="llm-field-hint">留空 = 不修改已保存的 Key</span></div>
+    <div class="form-item" style="margin-bottom:10px"><label>模型名</label><input class="input" id="llm-model" placeholder="deepseek-flash"/></div>
+    <div style="margin:14px 0 0 104px; display:flex; gap:10px; align-items:center">
+      <button class="btn btn-primary" id="llm-save">保存并启用</button>
+      <button class="btn" id="llm-test">测试连接</button>
+      <button class="btn" id="llm-clearkey">恢复服务端默认 Key</button>
+    </div>
+    <div id="llm-test-result"></div>
+
+    <details style="margin:14px 0 0 104px">
+      <summary class="llm-hint" style="cursor:pointer;user-select:none">高级选项：管理口令（公网部署时必填）</summary>
+      <div class="form-item" style="margin-top:8px"><label>管理口令</label><input class="input" id="llm-admin" type="password" placeholder="服务端启用 ADMIN_TOKEN 后必填"/><span class="llm-field-hint">仅存本机浏览器，用于保存配置等写操作鉴权</span></div>
+    </details>
+
+    <div class="form-section">使用说明</div>
+    <div class="llm-hint">
+      · 三步接入：① 到大模型服务商官网申请 API Key → ② 在上方填入接入地址、Key、模型名 → ③ 点「保存并启用」，平台所有 AI 功能立即改用该模型。<br>
+      · 「测试连接」用的是输入框里的信息（未保存也可直接测）；Key 在服务端只显示尾号，不回显明文。<br>
+      · 点「恢复服务端默认 Key」可随时撤回自定义配置，回到服务端内置 Key。<br>
+      · 即使未配置或调用失败，AI 功能也会自动降级为模板生成（结果中「生成方式」标注），平台使用不受影响。
+    </div>
+  </div>`;
+
+  const $status = document.getElementById('llm-status');
+  const $test = document.getElementById('llm-test-result');
+  const adminInput = document.getElementById('llm-admin');
+  adminInput.value = getAdminToken();
+  adminInput.addEventListener('change', () => {
+    setAdminToken(adminInput.value.trim());
+    toast(adminInput.value.trim() ? '管理口令已保存到本机' : '已清除本机管理口令');
+  });
+
+  async function refreshStatus() {
+    try {
+      const [hc, cc] = await Promise.all([remoteApi('GET', '/api/health'), remoteApi('GET', '/api/llm-config')]);
+      if (!cc || !cc.ok) { $status.innerHTML = `<span class="llm-dot bad"></span>配置读取失败：${esc((cc && cc.error) || '后端不可达')}`; return; }
+      const c = cc.data;
+      $status.innerHTML = `<span class="llm-dot ${c.keyConfigured ? 'ok' : 'bad'}"></span>
+        当前状态：<b>${hc.ok && hc.data.llmReady ? '真实大模型分析已启用' : '未配置（模板降级）'}</b>
+        · 模型：${esc(c.model || '-')} · 地址：${esc(c.baseUrl || '-')}
+        ${c.adminAuth ? '· <span class="llm-hint">服务端已启用管理口令</span>' : ''}`;
+      document.getElementById('llm-source').textContent =
+        '生效来源：' + (c.keySource || (c.keyConfigured ? '服务端内置 Key' : '未配置'))
+        + '（优先级：本页保存 > 服务端环境变量 > 程序默认）';
+      document.getElementById('llm-baseurl').value = c.baseUrl || '';
+      document.getElementById('llm-model').value = c.model || '';
+      document.getElementById('llm-apikey').placeholder = c.keyConfigured
+        ? '已配置（' + c.keyMasked + '），留空 = 不修改'
+        : 'sk-...';
+    } catch (e) {
+      $status.innerHTML = `<span class="llm-dot bad"></span>后端不可达：${esc(e.message)}`;
+    }
+  }
+
+  async function saveConfig(extra) {
+    const payload = Object.assign({
+      baseUrl: document.getElementById('llm-baseurl').value.trim(),
+      model: document.getElementById('llm-model').value.trim(),
+    }, extra || {});
+    const key = document.getElementById('llm-apikey').value.trim();
+    if (key) payload.apiKey = key;   // 留空不提交 = 保持已存 Key 不变
+    const r = await remoteApi('PUT', '/api/llm-config', payload);
+    if (!r || !r.ok) { toast((r && r.error) || '保存失败', 'error'); return false; }
+    toast('配置已保存并生效');
+    document.getElementById('llm-apikey').value = '';
+    refreshStatus();
+    return true;
+  }
+
+  document.getElementById('llm-save').addEventListener('click', () => saveConfig());
+  document.getElementById('llm-clearkey').addEventListener('click', async () => {
+    if (!confirm('确定撤回自定义 Key，恢复为服务端内置 Key 吗？')) return;
+    document.getElementById('llm-apikey').value = '';
+    await saveConfig({ apiKey: '' });   // 显式空值 = 清除覆盖，回落服务端环境变量
+  });
+  document.getElementById('llm-test').addEventListener('click', async () => {
+    $test.className = 'llm-test-result';
+    $test.textContent = '测试中…（最长等待服务端超时 60s）';
+    const body = {
+      baseUrl: document.getElementById('llm-baseurl').value.trim(),
+      model: document.getElementById('llm-model').value.trim(),
+    };
+    const key = document.getElementById('llm-apikey').value.trim();
+    if (key) body.apiKey = key;   // 输入框有值则直接测输入值，未保存也可测
+    const r = await remoteApi('POST', '/api/llm-config/test', body);
+    if (r && r.ok) {
+      $test.className = 'llm-test-result ok';
+      $test.textContent = '✅ 连接成功 · ' + r.data.model + ' · 延迟 ' + r.data.latencyMs + 'ms'
+        + (r.data.sample ? ' · 回复样例：「' + r.data.sample + '」' : '');
+    } else {
+      $test.className = 'llm-test-result bad';
+      $test.textContent = '❌ ' + ((r && r.error) || '测试失败');
+    }
+  });
+
+  refreshStatus();
+}
+
+/* ---------- 仪表盘 ---------- */
+function donutSvg(segments, size = 120, thickness = 14) {
+  const cx = size / 2, r = (size - thickness) / 2 - 2;
+  const C = 2 * Math.PI * r;
+  let acc = 0, arcs = '';
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  segments.forEach(sg => {
+    const frac = sg.value / total;
+    if (frac <= 0) return;
+    const dash = frac * C;
+    // 分段过小时不做两端收缩，避免出现负 dasharray（会被渲染为整圆）
+    const on = dash > 4 ? dash - 2 : dash;
+    const off = dash > 4 ? C - dash + 2 : C - dash;
+    arcs += `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${sg.color}" stroke-width="${thickness}"
+      stroke-dasharray="${on} ${off}" stroke-dashoffset="${-acc * C + C / 4}" stroke-linecap="butt"/>`;
+    acc += frac;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}</svg>`;
+}
+function pieSvg(segments, size = 130) {
+  const cx = size / 2, r = size / 2 - 2;
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  let a0 = -Math.PI / 2, arcs = '';
+  segments.forEach(sg => {
+    const frac = sg.value / total;
+    if (frac <= 0) return;
+    const a1 = a0 + frac * 2 * Math.PI;
+    const x0 = cx + r * Math.cos(a0), y0 = cx + r * Math.sin(a0);
+    const x1 = cx + r * Math.cos(a1), y1 = cx + r * Math.sin(a1);
+    arcs += `<path d="M${cx} ${cx} L${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${frac > .5 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)} z" fill="${sg.color}"/>`;
+    a0 = a1;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}</svg>`;
+}
+function curveSvg(color = '#ff4d4f') {
+  return `<svg width="100%" height="60" viewBox="0 0 220 60" preserveAspectRatio="none">
+    <path d="M5 45 C 30 10, 55 8, 80 22 S 130 48, 155 38 S 200 18, 215 22" fill="none" stroke="${color}" stroke-width="1.6"/>
+    <path d="M5 45 C 30 10, 55 8, 80 22 S 130 48, 155 38 S 200 18, 215 22 L215 58 L5 58 z" fill="${color}" opacity=".08"/>
+  </svg>`;
+}
+function barChartSvg(items, width = 1080, height = 280) {
+  const padL = 36, padB = 84, padT = 10;
+  const maxV = 180;
+  const plotH = height - padB - padT, plotW = width - padL - 8;
+  const step = plotW / items.length;
+  let gridLines = '', bars = '', labels = '', ticks = '';
+  for (let i = 0; i <= 6; i++) {
+    const y = padT + plotH - i * plotH / 6;
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${width - 8}" y2="${y}" stroke="#f0f0f0"/>`;
+    ticks += `<text x="${padL - 6}" y="${y + 4}" font-size="10" fill="rgba(0,0,0,.45)" text-anchor="end">${maxV / 6 * i}</text>`;
+  }
+  items.forEach((it, i) => {
+    const h = it[1] / maxV * plotH;
+    const x = padL + i * step + step * .25;
+    bars += `<rect x="${x.toFixed(1)}" y="${(padT + plotH - h).toFixed(1)}" width="${(step * .5).toFixed(1)}" height="${h.toFixed(1)}" fill="#1a6de0"/>`;
+    labels += `<text x="${(padL + i * step + step * .5).toFixed(1)}" y="${height - padB + 12}" font-size="10" fill="rgba(0,0,0,.65)" transform="rotate(45 ${(padL + i * step + step * .5).toFixed(1)} ${height - padB + 12})" text-anchor="start">${esc(it[0])}</text>`;
+  });
+  return `<svg width="100%" viewBox="0 0 ${width} ${height}">${gridLines}${ticks}${bars}${labels}</svg>`;
+}
+function arrowUp() { return `<svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:-1px"><path d="M5 1l4 6H1z" fill="currentColor"/></svg>`; }
+
+async function renderDashboard() {
+  const res = await AgentBridge.call('getDashboardStats');
+  const d = res.data;
+  const a = d.asset, vs = d.vulnStatus;
+  const statusColor = { '待处理': '#2f54eb', '修复中': '#13c2c2', '已修复': '#52c41a', '确认中': '#ff4d4f', '待复测': '#13c2c2', '忽略/误报': '#52c41a' };
+  const donutSegs = Object.entries(vs).filter(([k]) => k !== 'total').map(([k, v]) => ({ value: v, color: statusColor[k] || '#8c8c8c' }));
+  const pieSegs = d.levelDist.map(x => ({ value: x.pct, color: LEVEL_PIE_COLOR[x.level] }));
+  const top5Max = Math.max(...d.top5.map(x => x[1]));
+  // AI 漏洞研判（读取类动作，自动执行）：检测「高分与情报缺失并存」的评分异常
+  const anomalies = [];
+  const OPEN_STATUSES = ['待处理', '确认中', '修复中', '待复测'];   // 已修复/误报/忽略 属于已闭环，不作为待关注异常
+  [['ip', DB.vulnsIp], ['web', DB.vulnsWeb]].forEach(([kind, list]) => {
+    list.forEach(v => {
+      const intelMissing = v.exp === '无' && v.poc === '无' && v.patch === '无' && v.wild === '否';
+      if (v.vpt === 'P0' && intelMissing && OPEN_STATUSES.includes(v.status)) anomalies.push({ kind, v, score: calcVptScore(v).score });
+    });
+  });
+  const aiJudgeRows = (arr) => arr.map(a => `<div class="aij-item" data-kind="${a.kind}" data-id="${a.v.id}">
+      <div class="aij-row">${vptSpan(a.v.vpt)}<span class="aij-name">${esc(a.v.name)}</span><span class="aij-score">${a.score}<span>分</span></span></div>
+      <div class="aij-desc">检测到高分与情报缺失并存，建议优先核查评分来源及当前处置状态。</div>
+      <span class="aij-trace">研判依据：VPT 规则计分 ${a.score}（${esc(a.v.vpt)}）× 情报四项（有无EXP/POC/补丁发布/在野利用）均为空</span>
+    </div>`).join('');
+  const aiJudgeCard = anomalies.length ? `
+  <div class="card ai-judge-card" style="margin-top:12px">
+    <div class="aij-head">
+      <div class="dh-ic"><svg width="15" height="15" viewBox="0 0 14 14"><path d="M7 1l1.5 4.5L13 7l-4.5 1.5L7 13l-1.5-4.5L1 7l4.5-1.5L7 1z" fill="currentColor"/></svg></div>
+      <span class="aij-title">AI 漏洞研判</span><span class="beta-mini">BETA</span>
+      <span class="aij-sub">基于 VPT 规则、漏洞情报与处置记录</span>
+    </div>
+    <div class="aij-sum">
+      <div><div class="aij-k">待关注的评分异常</div><div class="aij-n">${anomalies.length}<span>条</span></div></div>
+      <div class="aij-typ"><span>典型问题</span><b>评分依据需要核实</b></div>
+    </div>
+    <div class="aij-list" id="aij-list" data-exp="0">${aiJudgeRows(anomalies.slice(0, 3))}</div>
+    <div class="aij-foot"><span>只展示需要关注的异常，不重复展示全部漏洞</span><a id="aij-all">查看全部 ${anomalies.length} 条 →</a></div>
+  </div>` : `
+  <div class="card ai-judge-card" style="margin-top:12px">
+    <div class="aij-head">
+      <div class="dh-ic"><svg width="15" height="15" viewBox="0 0 14 14"><path d="M7 1l1.5 4.5L13 7l-4.5 1.5L7 13l-1.5-4.5L1 7l4.5-1.5L7 1z" fill="currentColor"/></svg></div>
+      <span class="aij-title">AI 漏洞研判</span><span class="beta-mini">BETA</span>
+      <span class="aij-sub">基于 VPT 规则、漏洞情报与处置记录</span>
+    </div>
+    <div class="aij-list" style="margin-top:12px"><div class="unknown-note" style="margin-top:0">✓ 未发现需要关注的评分异常</div></div>
+  </div>`;
+  $content.innerHTML = `
+  <div class="dash-top">组织机构筛选: <select class="select" style="width:240px"><option></option>${DB.orgTree.map(o => `<option>${esc(o)}</option>`).join('')}</select></div>
+  <div class="stat-row">
+    <div class="card asset-card" style="margin-bottom:0">
+      <div class="ac-left">
+        <svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="#e6f4ff"/><path d="M26 8l14 7v10c0 8-5.7 14.2-14 16.4C17.7 39.2 12 33 12 25V15l14-7z" fill="#1668dc"/><circle cx="26" cy="25" r="7" fill="#fff"/><path d="M22.8 25.2l2.2 2.2 4.4-4.8" stroke="#1668dc" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><div class="text-secondary" style="text-align:center">资产总数</div><div class="ac-total">${a.total}</div></div>
+      </div>
+      <div class="ac-grid">
+        ${[['主机资产', a.host], ['Web 资产', a.web], ['域名资产', a.domain], ['已纳管', a.managed],
+           ['未纳管', a.unmanaged], ['历史资产', a.history], ['已排除', a.excluded]].map(([k, v]) => `<div class="ac-cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card vul-status-card" style="margin-bottom:0">
+      <div class="card-title">漏洞处置状态</div>
+      <div class="vs-select"><select class="select" style="width:130px"><option>全部漏洞</option><option>IP 漏洞</option><option>Web 漏洞</option></select></div>
+      <div class="vul-status-flex">
+        <div class="vul-status-donut">${donutSvg(donutSegs)}<div><span class="text-secondary">漏洞总数</span></div><div class="num">${vs.total}</div></div>
+        <div class="vul-status-legend">
+          ${Object.entries(vs).filter(([k]) => k !== 'total').map(([k, v]) =>
+            `<div class="vs-cell"><div class="k"><i class="dot" style="background:${statusColor[k]}"></i>${k}</div><div class="v">${v}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="trend-row">
+    ${d.trends.map(t => `<div class="trend-card">
+      <div class="tc-left"><div class="tc-title">${esc(t.title)}</div><div class="tc-num">${t.num}</div></div>
+      <div class="tc-chart">${curveSvg()}<div class="tc-cmp"><span>环比（与上周对比）</span><span class="tc-up">${arrowUp()} ${t.cmp} %</span></div></div>
+    </div>`).join('')}
+  </div>
+  ${aiJudgeCard}
+  <div class="perspective-tabs">
+    <button class="psp-tab active" data-psp="漏洞视角">漏洞视角</button>
+    <button class="psp-tab" data-psp="资产视角">资产视角</button>
+    <button class="psp-tab" data-psp="运营视角">运营视角</button>
+  </div>
+  <div class="dash-charts" id="dash-charts">
+    <div class="card chart-card" style="margin-bottom:0">
+      <div class="cc-head"><span class="cc-title">漏洞等级分布</span><select class="select" style="width:130px"><option>全部</option></select></div>
+      <div class="pie-flex">
+        ${pieSvg(pieSegs)}
+        <div class="legend-list">
+          ${d.levelDist.map(x => `<div class="lg-row"><i class="lg-swatch" style="background:${LEVEL_PIE_COLOR[x.level]}"></i>${x.level} ${x.pct}%</div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card chart-card" style="margin-bottom:0">
+      <div class="cc-head"><span class="cc-title">已修复漏洞数</span><select class="select" style="width:130px"><option>全部</option></select></div>
+      <div class="repair-donut-wrap">
+        <div style="position:relative">${donutSvg([{ value: 0.99, color: '#52c41a' }, { value: 99.01, color: '#f0f0f0' }], 150, 12)}
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <span class="text-secondary">漏洞修复率</span><span style="color:#52c41a;font-size:20px;font-weight:600">${d.repair.rate}</span>
+          </div></div>
+        <div class="rd-stats"><span>漏洞总数 <span class="big">${d.repair.total}</span></span><span>已修复漏洞 <span class="green">${d.repair.fixed}</span></span></div>
+      </div>
+    </div>
+    <div class="card chart-card" style="margin-bottom:0">
+      <div class="cc-title">组织部门未修复漏洞TOP5</div>
+      <div class="top5-list">
+        ${d.top5.map(([name, val]) => `<div class="top5-row"><span class="t5-name">${esc(name)}</span>
+          <span class="t5-bar"><i style="width:${(val / top5Max * 100).toFixed(1)}%"></i></span><span class="t5-val">${val}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>
+  <div class="card chart-card" style="margin-top:12px">
+    <div class="cc-head"><span class="cc-title">漏洞类型分布</span><select class="select" style="width:130px"><option>全部</option></select></div>
+    ${barChartSvg(d.vulnTypes)}
+  </div>`;
+  $content.querySelectorAll('.psp-tab').forEach(b => b.addEventListener('click', () => {
+    $content.querySelectorAll('.psp-tab').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    toast('已切换到「' + b.dataset.psp + '」', 'success');
+  }));
+  // AI 漏洞研判卡片交互：条目点击 → 对应漏洞详情（读取类，无需确认）；查看全部 → 展开/收起
+  const bindAijItems = () => $content.querySelectorAll('.aij-item').forEach(el => el.addEventListener('click', () => {
+    location.hash = '#/vulns/' + el.dataset.kind + '?id=' + el.dataset.id;
+  }));
+  bindAijItems();
+  const aijAll = document.getElementById('aij-all');
+  if (aijAll) aijAll.addEventListener('click', () => {
+    const listEl = document.getElementById('aij-list');
+    const expanded = listEl.dataset.exp === '1';
+    listEl.dataset.exp = expanded ? '0' : '1';
+    listEl.innerHTML = aiJudgeRows(expanded ? anomalies.slice(0, 3) : anomalies);
+    bindAijItems();
+    aijAll.textContent = expanded ? '查看全部 ' + anomalies.length + ' 条 →' : '收起 ↑';
+  });
+}
+
+/* ---------- 工单运营报表 ---------- */
+function renderTicketStats() {
+  $content.innerHTML = `
+  <div class="card">
+    <div class="filter-bar" style="align-items:center">
+      <div class="filter-item"><span><i class="req" style="color:#ff4d4f">*</i> 统计时间范围</span>
+        <input class="input" style="width:130px" value="2026-10-14"> <span class="text-secondary">→</span>
+        <input class="input" style="width:130px" value="2026-10-20"></div>
+      <div class="filter-item">组织机构 <select class="select" style="width:260px"><option></option>${DB.orgTree.map(o => `<option>${esc(o)}</option>`).join('')}</select></div>
+      <div class="spacer"></div>
+      <button class="btn btn-primary">查 询</button>
+      <button class="btn">重 置</button>
+    </div>
+    <div class="mini-tabs">
+      <div class="mini-tab active" data-mt="dept">按部门统计</div>
+      <div class="mini-tab" data-mt="person">按人员统计</div>
+      <div class="mini-tab" data-mt="rank">运营排名</div>
+    </div>
+    <div class="row-flex" style="margin-bottom:8px">
+      <div style="font-size:15px;font-weight:600">部门漏洞修复统计</div>
+      <div class="spacer"></div>
+      <span class="text-secondary">数据统计截止：2026-10-20 08:44:55</span>
+      <button class="btn btn-primary">导 出</button>
+    </div>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr><th>部门名称</th><th>未修复漏洞数 <span class="sort-arrows">▲<br>▼</span></th><th>已修复漏洞数</th><th>漏洞修复率 <span class="sort-arrows">▲<br>▼</span></th><th>延期漏洞数</th><th>延期率</th><th>平均确认时间(小时)</th><th>平均修复时间(小时)</th></tr></thead>
+        <tbody>
+          <tr><td class="cell-link">根组织机构</td><td>2</td><td>0</td><td style="color:#ff4d4f">0%</td><td>0</td><td style="color:#52c41a">0%</td><td>-</td><td>-</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination"><span>共 1 条</span><span class="pg-item">‹</span><span class="pg-item active">1</span><span class="pg-item">›</span></div>
+    <div class="report-color-note">
+      颜色说明：<span class="n-green">绿色</span> —修复率=100% / 延期率=0%　<span class="n-yellow">黄色</span> —修复率95%-99% / 延期率0%-5%　<span class="n-red">红色</span> —修复率&lt;95% / 延期率&gt;5%<br>
+      ⓘ 指标说明：报表内指标每日统计，数值代表当日新增指标数量，非累计数据。
+    </div>
+  </div>`;
+  $content.querySelectorAll('.mini-tab').forEach(t => t.addEventListener('click', () => {
+    $content.querySelectorAll('.mini-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  }));
+}
+
+/* ---------- 漏洞列表（IP / Web） ---------- */
+async function renderVulList(kind, tab = '全部') {
+  const counts = kind === 'ip' ? DB.vulnsIpCounts : DB.vulnsWebCounts;
+  const res = await AgentBridge.call('queryVulns', { kind, tab });
+  const rows = res.data;
+  const isIp = kind === 'ip';
+  const tabsHtml = Object.entries(counts).map(([k, v]) =>
+    `<div class="state-tab${k === tab ? ' active' : ''}" data-tab="${esc(k)}">${esc(k)} (${v})</div>`).join('');
+  const filters = isIp
+    ? `漏洞名称: <input class="input">　漏洞等级: <select class="select"><option></option>${LEVELS.map(l => `<option>${l}</option>`).join('')}</select>
+       影响资产状态: <select class="select"><option></option></select>　影响资产: <input class="input">`
+    : `漏洞名称: <input class="input">　漏洞等级: <select class="select"><option></option>${LEVELS.map(l => `<option>${l}</option>`).join('')}</select>
+       影响资产: <input class="input">　关联域名: <input class="input">`;
+  $content.innerHTML = `
+  <div class="card">
+    <div class="state-tabs">
+      ${tabsHtml}
+      <span class="st-spacer"></span>
+      <div class="st-actions">
+        <a>新建</a><a>批量导入</a><a>漏洞配置</a><a>重置</a>
+      </div>
+    </div>
+    <div class="filter-bar" style="margin-top:8px">${filters}<span class="filter-more">···</span></div>
+    <div class="select-bar"><span>已选 <b>0</b> 条</span>
+      <svg width="11" height="11" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor"/></svg>
+      <span style="color:#d9d9d9">纳管　取消纳管　排除　下架</span>
+      <div class="sb-right"><a>批量操作</a><a>下载</a><span style="color:#8c8c8c;display:inline-flex">${ICONS.refresh}</span></div>
+    </div>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr>
+          <th style="width:34px"><input type="checkbox"></th>
+          <th>漏洞名称</th><th>CVE</th><th>漏洞类型</th><th>VPT <span class="sort-arrows">▲<br>▼</span></th><th>漏洞等级</th>
+          <th>${isIp ? '影响资产' : '影响资产'}</th><th>漏洞来源</th><th>操作 <span style="float:right">${ICONS.setting}</span></th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(v => `<tr data-id="${v.id}">
+            <td><input type="checkbox" class="row-chk"></td>
+            <td class="cell-link vul-name" title="${esc(v.name)}">${esc(v.name)}</td>
+            <td>${esc(v.cve)}</td>
+            <td>${esc(v.type)}</td>
+            <td>${vptSpan(v.vpt)}</td>
+            <td>${levelTag(v.level)}</td>
+            <td class="cell-link">${esc(v.asset)}</td>
+            <td title="${esc(v.source)}">${esc(v.source)}</td>
+            <td><span class="ops">
+              <button class="icon-btn" data-act="detail" title="查看详情">${ICONS.eye}</button>
+              ${isIp ? '' : `<button class="icon-btn" data-act="mail" title="发送">${ICONS.mail}</button>`}
+              <button class="icon-btn" data-act="wrench" title="处置">${ICONS.wrench}</button>
+              <button class="icon-btn danger" data-act="delete" title="删除">${ICONS.trash}</button>
+            </span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      共 ${counts[tab] ?? counts['全部']} 条
+      ${(() => {
+        const pages = Math.max(1, Math.ceil((counts[tab] ?? counts['全部']) / 20));
+        let btns = '<span class="pg-item">‹</span>';
+        for (let p = 1; p <= Math.min(pages, 5); p++) btns += `<span class="pg-item${p === 1 ? ' active' : ''}">${p}</span>`;
+        if (pages > 5) btns += `<span>···</span><span class="pg-item">${pages}</span>`;
+        btns += '<span class="pg-item">›</span>';
+        return btns;
+      })()}
+      <select class="select" style="width:96px"><option>20 条/页</option><option>50 条/页</option><option>100 条/页</option></select>
+      跳至 <input class="input pg-jump"> 页
+    </div>
+  </div>`;
+
+  // tab 切换：真实筛选（重新渲染该状态的列表，计数/分页随之对称）
+  $content.querySelectorAll('.state-tab').forEach(t => t.addEventListener('click', () => {
+    renderVulList(kind, t.dataset.tab);
+  }));
+  // 打开详情
+  const openDetail = id => { location.hash = `#/vulns/${kind}?id=${id}`; };
+  $content.querySelectorAll('.vul-name').forEach(el => el.addEventListener('click', () => openDetail(el.closest('tr').dataset.id)));
+  $content.querySelectorAll('[data-act="detail"]').forEach(el => el.addEventListener('click', () => openDetail(el.closest('tr').dataset.id)));
+  $content.querySelectorAll('[data-act="delete"]').forEach(el => el.addEventListener('click', async () => {
+    const id = el.closest('tr').dataset.id;
+    const r = await AgentBridge.call('setVulnStatus', { kind, id, status: '误报' });
+    toast(r.ok ? '已标记（演示：加入误报）' : '操作失败', r.ok ? 'success' : 'error');
+  }));
+}
+
+/* ---------- 漏洞详情 ---------- */
+async function renderVulDetail(kind, qs) {
+  const id = new URLSearchParams(qs).get('id');
+  const res = await AgentBridge.call('getVuln', { kind, id });
+  if (!res.ok) { renderSimplePage('漏洞详情', '未找到该漏洞'); return; }
+  const v = res.data;
+  $content.innerHTML = `
+  <div class="detail-top">
+    ${levelTag(v.level)} <span style="font-size:15px;font-weight:600">${esc(v.name)}</span>
+    <div class="dt-actions">
+      <a id="dt-edit">编辑</a><a id="dt-status">设置状态</a><a id="dt-ticket">创建工单</a><a id="dt-back">返回列表</a>
+    </div>
+  </div>
+  <div class="detail-grid">
+    <div>
+      <div class="card ai-judge-card" id="ai-judge-card">
+        <div class="aij-head">
+          <div class="dh-ic"><svg width="15" height="15" viewBox="0 0 14 14"><path d="M7 1l1.5 4.5L13 7l-4.5 1.5L7 13l-1.5-4.5L1 7l4.5-1.5L7 1z" fill="currentColor"/></svg></div>
+          <span class="aij-title">AI 研判摘要</span><span class="beta-mini">BETA</span>
+          <a class="hyper" id="judge-regen" style="margin-left:auto;font-size:12px">重新研判</a>
+        </div>
+        <div id="ai-judge-body" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">基础信息</div>
+        <div class="field-grid">
+          <div class="fg-item"><span class="k">漏洞存在位置：</span><span class="v">${esc(v.asset)}${v.port !== '(空)' ? ':' + esc(v.port) : ''}/${esc(v.proto)}</span></div>
+          <div class="fg-item"><span class="k">漏洞负责人：</span><span class="v">${esc(v.owner)}</span></div>
+          <div class="fg-item"><span class="k">漏洞其他负责人：</span><span class="v">${esc(v.coOwner)}</span></div>
+          <div class="fg-item"><span class="k">影响资产：</span><span class="v hyper">${esc(v.asset)}</span></div>
+          <div class="fg-item"><span class="k">资产名称：</span><span class="v">${esc(v.assetName)}</span></div>
+          <div class="fg-item"><span class="k">业务系统：</span><span class="v hyper">${esc(v.biz)}</span></div>
+          <div class="fg-item"><span class="k">所属域：</span><span class="v">${esc(v.domain)}</span></div>
+          <div class="fg-item"><span class="k">所属组织机构：</span><span class="v">${esc(v.org)}</span></div>
+          <div class="fg-item"><span class="k">首次发现时间：</span><span class="v">${esc(v.firstFound)}</span></div>
+          <div class="fg-item"><span class="k">最近更新时间：</span><span class="v">${esc(v.lastUpdate)}</span></div>
+          <div class="fg-item"><span class="k">最近发现时间：</span><span class="v">${esc(v.lastFound)}</span></div>
+          <div class="fg-item"><span class="k">漏洞来源：</span><span class="v">${esc(v.source)} <a>更多信息</a></span></div>
+          <div class="fg-item"><span class="k">CVE：</span><span class="v">${esc(v.cve)}</span></div>
+          <div class="fg-item"><span class="k">CNVD：</span><span class="v">${esc(v.cnvd)}</span></div>
+          <div class="fg-item"><span class="k">CNNVD：</span><span class="v">${esc(v.cnnvd)}</span></div>
+          <div class="fg-item"><span class="k">CTID：</span><span class="v">${esc(v.ctid)}</span></div>
+          <div class="fg-item"><span class="k">VPT：</span><span class="v">${esc(v.vpt)}</span></div>
+          <div class="fg-item"><span class="k">CVSS评分：</span><span class="v">${esc(v.cvss)}</span></div>
+          <div class="fg-item"><span class="k">漏洞类型：</span><span class="v">${esc(v.type)}</span></div>
+          <div class="fg-item"><span class="k">漏洞协议：</span><span class="v">${esc(v.proto)}</span></div>
+          <div class="fg-item"><span class="k">漏洞端口：</span><span class="v">${esc(v.port)}</span></div>
+          <div class="fg-item"><span class="k">漏洞服务：</span><span class="v">${esc(v.service)}</span></div>
+          <div class="fg-item"><span class="k">检测方式：</span><span class="v">${esc(v.detect)}</span></div>
+          <div class="fg-item"><span class="k">利用方式：</span><span class="v">${esc(v.exploit)}</span></div>
+          <div class="fg-item"><span class="k">利用复杂度：</span><span class="v">${esc(v.complexity)}</span></div>
+          <div class="fg-item"><span class="k">计划修复时间：</span><span class="v">${esc(v.planFix)}</span></div>
+        </div>
+        <div class="kv-line" style="margin-top:12px"><span class="k">自定义标签：</span><span class="v">${esc(v.complexity === '(空)' ? '(空)' : '')}</span></div>
+        <div class="kv-line"><span class="k">漏洞标签：</span>
+          <span class="v">${v.tags.map(t => `<span class="chip">${esc(t)} <span class="x">×</span></span>`).join(' ')}<a class="hyper" style="margin-left:6px;font-size:12px">＋ 新增标签</a></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">情报信息</div>
+        <div class="field-grid">
+          <div class="fg-item"><span class="k">有无EXP：</span><span class="v">${esc(v.exp)}</span></div>
+          <div class="fg-item"><span class="k">有无POC：</span><span class="v">${esc(v.poc)}</span></div>
+          <div class="fg-item"><span class="k">有无补丁发布：</span><span class="v">${esc(v.patch)}</span></div>
+          <div class="fg-item"><span class="k">在野利用：</span><span class="v">${esc(v.wild)}</span></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-title">漏洞描述</div><div class="desc-block">${esc(v.desc)}</div></div>
+      <div class="card"><div class="card-title">漏洞危害</div><div class="desc-block">${esc(v.danger)}</div></div>
+      <div class="card"><div class="card-title">修复建议</div><div class="desc-block">${esc(v.fix)}</div>
+        <div class="fix-ai-entry">
+          <button class="ai-btn" id="fix-ai-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1l1.5 4.5L13 7l-4.5 1.5L7 13l-1.5-4.5L1 7l4.5-1.5L7 1z" fill="currentColor"/></svg>
+            修复建议助手 <span class="beta-mini">BETA</span>
+          </button>
+          <span class="ai-entry-note">基于平台资产台账与处置记录生成本客户场景的本地化建议，结论均可溯源</span>
+        </div>
+      </div>
+      <div class="card"><div class="card-title">相关信息</div><div class="desc-block">${v.refs.length ? v.refs.map(r => `<a>${esc(r)}</a>`).join('<br>') : '<span class="text-secondary">(空)</span>'}</div></div>
+      <div class="card">
+        <div class="card-title">附件</div>
+        <div class="text-secondary">漏洞附件列表（空）</div>
+        <a style="font-size:13px;display:inline-block;margin-top:6px">上传附件</a>
+      </div>
+      <div class="card">
+        <div class="card-title">扩展属性</div>
+        <div class="kv-line"><span class="k" style="width:120px">测试一下：</span><span class="v">0</span></div>
+        <div class="kv-line"><span class="k" style="width:120px">bjyh：</span><span class="v">(空)</span></div>
+      </div>
+    </div>
+    <div class="card" style="max-height:640px;overflow-y:auto">
+      <div class="card-title">处置记录</div>
+      <div class="timeline">
+        ${[
+          ['2026-07-12 15:23:07', 'admin 待处理'],
+          ['2026-07-12 15:22:39', 'admin 已修复'],
+          ['2026-06-26 00:42:38', 'sso.zhiqiang.zhao 已修复<br>厂商补丁false 人工-1'],
+          ['2026-05-09 10:41:42', '待处理<br>新增漏洞'],
+        ].map(([t, b]) => `<div class="tl-item"><div class="tl-time">${esc(t)}</div><div class="tl-body">${b}</div></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('dt-back').addEventListener('click', () => { location.hash = '#/vulns/' + kind; });
+  document.getElementById('dt-edit').addEventListener('click', () => openVulEditModal(kind, v));
+  document.getElementById('dt-status').addEventListener('click', () => openStatusModal(kind, v));
+  document.getElementById('dt-ticket').addEventListener('click', async () => {
+    const r = await AgentBridge.call('createTicket', { vulnId: v.id });
+    toast(r.ok ? '已创建工单（演示），已写入审计日志' : '创建失败', r.ok ? 'success' : 'error');
+  });
+  document.getElementById('fix-ai-btn').addEventListener('click', () => openFixAssistant(kind, v));
+  document.getElementById('judge-regen').addEventListener('click', () => loadJudgement(kind, v));
+  loadJudgement(kind, v);
+}
+
+/* ---------- 功能一：AI 研判摘要（详情页首卡，读取类自动执行） ---------- */
+const JUDGE_STEPS = [
+  { tool: 'getVuln', label: '读取漏洞上下文（等级 / VPT / 类型 / CVE）' },
+  { tool: 'getVptAttribution', label: '计算 VPT 归因与特殊规则命中' },
+  { tool: 'searchKnowledge', label: '检索知识库与情报库' },
+  { tool: 'getDisposalRecords', label: '读取处置记录时间线' },
+  { tool: 'organize', label: '组织语言生成研判摘要（逐条溯源）' },
+];
+async function loadJudgement(kind, v) {
+  const host = document.getElementById('ai-judge-body');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="step-list" id="judge-steps">
+      ${JUDGE_STEPS.map((s, i) => `<div class="step-row" id="judge-step-${i}"><span class="sp-ic">✓</span><span>${esc(s.label)}</span><span class="sp-note"></span></div>`).join('')}
+    </div>
+    <div id="judge-result"></div>`;
+  for (let i = 0; i < JUDGE_STEPS.length; i++) {
+    const el = document.getElementById('judge-step-' + i);
+    el.className = 'step-row doing';
+    let note = '';
+    const t = JUDGE_STEPS[i].tool;
+    if (t === 'getVuln') { const r = await AgentBridge.call('getVuln', { kind, id: v.id }); note = r.ok ? '已读取' : '读取失败'; }
+    else if (t === 'getVptAttribution') { const r = await AgentBridge.call('getVptAttribution', { kind, id: v.id }); note = r.ok ? (r.data.score + ' 分（' + r.data.key + '）· 特殊规则' + (r.data.byRule ? '命中' : '未命中')) : ''; }
+    else if (t === 'searchKnowledge') { const r = await AgentBridge.call('searchKnowledge', { kind, id: v.id }); note = r.ok ? '命中 ' + r.data.count + ' 条' : ''; }
+    else if (t === 'getDisposalRecords') { const r = await AgentBridge.call('getDisposalRecords', { kind, id: v.id }); note = r.ok ? r.data.count + ' 条记录' : ''; }
+    await new Promise(r => setTimeout(r, 240));
+    el.className = 'step-row done';
+    const nEl = el.querySelector('.sp-note'); if (nEl) nEl.textContent = note;
+  }
+  const res = await AgentBridge.call('generateJudgement', { kind, id: v.id });
+  const resultEl = document.getElementById('judge-result');
+  if (!res.ok) { resultEl.innerHTML = '<div class="unknown-note">研判失败：' + esc(res.error || '') + '</div>'; return; }
+  const d = res.data;
+  resultEl.innerHTML = `
+    <div class="advice-section" style="margin-bottom:10px">
+      <div class="advice-sec-title">研判摘要</div>
+      <div class="advice-sec-body">${esc(d.summary)}</div>
+    </div>
+    <div class="advice-section" style="margin-bottom:10px">
+      <div class="advice-sec-title">结论依据（${d.citations.length} 项）</div>
+      <div class="advice-sec-body">
+        ${d.citations.map(c => `<div class="kv-line" style="margin:2px 0"><span class="cite" title="${esc(c.from)}">※ ${esc(c.label)}</span><span class="v" style="color:rgba(0,0,0,.7)">${esc(c.detail)}</span></div>`).join('')}
+      </div>
+    </div>
+    ${d.unknowns.length ? `<div class="unknown-note">※ ${d.unknowns.map(u => esc(u)).join('<br>※ ')}</div>` : ''}
+    <div class="conf-band"><i class="conf-dot" style="background:${d.confidence.level === 'high' ? '#52c41a' : '#faad14'}"></i>置信度：<b>${esc(d.confidence.text)}</b>　|　依据 ${d.citations.length} 项 / 缺失 ${d.unknowns.length} 项　|　生成方式：${d.generatedBy === 'deepseek' ? 'DeepSeek 真实分析' : d.generatedBy ? '后端模板（LLM 未配置）' : '前端本地模拟'}</div>`;
+  resultEl.querySelectorAll('.cite').forEach(c => c.addEventListener('click', () => toast(c.title, 'success')));
+}
+
+/* ---------- 编辑弹窗（含漏洞等级评定交互） ---------- */
+function openVulEditModal(kind, v) {
+  const disabled = c => `<div class="form-item disabled"><label>${c.label}：</label>${c.select
+    ? `<select class="select" disabled><option>${esc(c.value)}</option></select>`
+    : `<input class="input" value="${esc(c.value)}" disabled placeholder="${esc(c.placeholder || '')}">`}</div>`;
+  const editable = c => `<div class="form-item"><label>${c.req ? `<i class="req">*</i>` : ''}${c.label}：</label>
+    ${c.select ? `<select class="select" data-field="${esc(c.field)}">${c.options.map(o => `<option${o === c.value ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+    : `<input class="input" data-field="${esc(c.field)}" value="${esc(c.value)}" placeholder="${esc(c.placeholder || '')}">`}</div>`;
+  $modalRoot.innerHTML = `
+  <div class="modal-mask" id="edit-mask">
+    <div class="modal">
+      <span class="modal-close" id="edit-close">×</span>
+      <div class="modal-title">基本信息</div>
+      <div class="form-grid">
+        ${editable({ label: '漏洞名称', req: 1, field: 'name', value: v.name, placeholder: v.name })}
+        ${disabled({ label: '漏洞类型', req: 1, select: 1, value: v.type })}
+        ${disabled({ label: '影响资产', req: 1, value: v.asset })}
+        ${editable({ label: '漏洞等级', req: 1, select: 1, field: 'level', value: v.level, options: LEVELS.slice(0, 4) })}
+        ${editable({ label: '所属组织机构', req: 1, select: 1, field: 'org', value: v.org, options: DB.orgTree })}
+        ${editable({ label: '漏洞服务', field: 'service', value: '', placeholder: '请输入漏洞服务' })}
+        ${editable({ label: '漏洞协议', field: 'proto', value: v.proto, placeholder: v.proto })}
+        ${editable({ label: 'CVSS评分', field: 'cvss', value: v.cvss, placeholder: '9.8' })}
+        ${editable({ label: 'CNNVD', field: 'cnnvd', value: v.cnnvd, placeholder: v.cnnvd })}
+        ${editable({ label: 'CVE', field: 'cve', value: v.cve, placeholder: v.cve })}
+        ${editable({ label: 'CNVD', field: 'cnvd', value: v.cnvd, placeholder: v.cnvd })}
+        ${editable({ label: '漏洞端口', field: 'port', value: v.port, placeholder: '3306' })}
+      </div>
+      <div class="form-section">详细信息</div>
+      <div class="form-item" style="margin-bottom:14px"><label class="ta-label"><i class="req">*</i>漏洞描述：</label><textarea data-field="desc">${esc(v.desc)}</textarea></div>
+      <div class="form-item" style="margin-bottom:14px"><label class="ta-label">漏洞危害：</label><textarea data-field="danger">${esc(v.danger)}</textarea></div>
+      <div class="form-item"><label class="ta-label"><i class="req">*</i>修复建议：</label><textarea data-field="fix">${esc(v.fix)}</textarea></div>
+      <div class="modal-footer">
+        <button class="btn" id="edit-cancel">取消</button>
+        <button class="btn btn-primary" id="edit-save">保存</button>
+      </div>
+    </div>
+  </div>`;
+  const close = () => { $modalRoot.innerHTML = ''; };
+  document.getElementById('edit-close').addEventListener('click', close);
+  document.getElementById('edit-cancel').addEventListener('click', close);
+  document.getElementById('edit-mask').addEventListener('click', e => { if (e.target.id === 'edit-mask') close(); });
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const patch = {};
+    $modalRoot.querySelectorAll('[data-field]').forEach(el => { patch[el.dataset.field] = el.value; });
+    const r = await AgentBridge.call('updateVuln', { kind, id: v.id, patch });
+    if (r.ok) {
+      const c = calcVptScore(r.data);
+      close();
+      toast('保存成功；按当前 VPT 规则计算分值 ' + c.score + (c.byRule ? '（特殊规则命中）' : '') + ' → ' + vptKeyOf(c.score));
+      router();
+    } else toast(r.error || '保存失败', 'error');
+  });
+}
+
+/* ---------- 设置状态弹窗 ---------- */
+function openStatusModal(kind, v) {
+  const statuses = ['待处理', '确认中', '修复中', '待复测', '已修复', '误报', '忽略'];
+  $modalRoot.innerHTML = `
+  <div class="modal-mask" id="st-mask">
+    <div class="modal" style="width:420px">
+      <span class="modal-close" id="st-close">×</span>
+      <div class="modal-title">设置状态</div>
+      <div class="form-item" style="margin-bottom:16px"><label>漏洞状态：</label>
+        <select class="select" id="st-select">${statuses.map(s => `<option${s === v.status ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+      <div class="modal-footer">
+        <button class="btn" id="st-cancel">取消</button>
+        <button class="btn btn-primary" id="st-save">确定</button>
+      </div>
+    </div>
+  </div>`;
+  const close = () => { $modalRoot.innerHTML = ''; };
+  document.getElementById('st-close').addEventListener('click', close);
+  document.getElementById('st-cancel').addEventListener('click', close);
+  document.getElementById('st-save').addEventListener('click', async () => {
+    const status = document.getElementById('st-select').value;
+    await AgentBridge.call('setVulnStatus', { kind, id: v.id, status });
+    close(); toast('状态已更新为「' + status + '」'); router();
+  });
+}
+
+/* ================================================================
+ * 修复建议助手（功能三：修复建议本地化 · AI Agent Beta）
+ * 入口位置：漏洞详情页「修复建议」卡片内
+ * 数据流：AgentBridge.call('generateFixAdvice') → 平台结构化数据组装
+ *        → 抽屉内任务拆解动画（LUI 反馈） → 结论带溯源标注渲染
+ *        → 人工确认采纳（状态变更） → 落审计日志
+ * ================================================================ */
+const FIX_STEPS = [
+  { tool: 'getVuln', label: '读取漏洞上下文（等级 / VPT / 类型 / CVE）' },
+  { tool: 'getVptAttribution', label: '计算 VPT 归因与特殊规则命中' },
+  { tool: 'searchKnowledge', label: '检索知识库与同源处置记录' },
+  { tool: 'getAssetProfile', label: '拉取影响资产档案与责任人' },
+  { tool: 'organize', label: '组织语言生成本地化建议（逐条溯源）' },
+];
+const modeBadgeHtml = () => '<span class="mode-badge">' + (AgentBridge.getConfig().mode === 'remote' ? '远程 API' : '本地模拟') + '</span>';
+function openFixAssistant(kind, v) {
+  // 关闭已有抽屉
+  closeFixAssistant();
+  const mask = document.createElement('div');
+  mask.className = 'drawer-mask'; mask.id = 'fix-drawer-mask';
+  mask.addEventListener('click', closeFixAssistant);
+  const drawer = document.createElement('div');
+  drawer.className = 'assistant-drawer'; drawer.id = 'fix-drawer';
+  drawer.innerHTML = `
+    <div class="drawer-head">
+      <div class="dh-ic"><svg width="16" height="16" viewBox="0 0 14 14"><path d="M7 1l1.5 4.5L13 7l-4.5 1.5L7 13l-1.5-4.5L1 7l4.5-1.5L7 1z" fill="currentColor"/></svg></div>
+      <div>
+        <div class="dh-title">修复建议助手 <span class="beta-mini">BETA</span> ${modeBadgeHtml()}</div>
+        <div class="dh-sub">分析对象：${esc(v.name)}（${esc(v.level)} · ${esc(v.vpt)}）</div>
+      </div>
+      <span class="drawer-close" title="关闭">×</span>
+    </div>
+    <div class="drawer-body">
+      <div class="ai-context">
+        <b>引用的平台数据：</b>漏洞详情（等级 / VPT / 类型 / CVE） · 资产台账 · 软件台账 · 漏洞知识库 · 处置记录时间线<br>
+        <b>生成方式：</b>仅基于平台已确认的结构化数据组织语言；不产生新的技术结论；缺失数据将明确标注「无法判断」。
+      </div>
+      <div class="step-list" id="fix-steps">
+        ${FIX_STEPS.map((s, i) => `<div class="step-row" id="fix-step-${i}"><span class="sp-ic">✓</span><span>${esc(s.label)}</span><span class="sp-note"></span></div>`).join('')}
+      </div>
+      <div id="fix-result"></div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-primary" id="fix-adopt" disabled>采纳并创建修复工单</button>
+      <button class="btn" id="fix-copy" disabled>复制全文</button>
+      <button class="btn" id="fix-regen" disabled>重新生成</button>
+      <div class="df-note">AI 生成内容仅供参考，采纳前请人工核对。<br>「采纳」为状态变更动作，将写入审计日志。</div>
+    </div>`;
+  document.body.appendChild(mask);
+  document.body.appendChild(drawer);
+  drawer.querySelector('.drawer-close').addEventListener('click', closeFixAssistant);
+  drawer.querySelector('#fix-adopt').addEventListener('click', () => confirmAdoptAdvice(kind, v));
+  drawer.querySelector('#fix-copy').addEventListener('click', () => copyAdviceText());
+  drawer.querySelector('#fix-regen').addEventListener('click', () => runFixGeneration(kind, v, true));
+  runFixGeneration(kind, v, false);
+}
+function closeFixAssistant() {
+  ['fix-drawer', 'fix-drawer-mask'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+}
+let lastAdvice = null, lastAdviceVuln = null;
+async function runFixGeneration(kind, v, regen) {
+  const steps = FIX_STEPS.map((_, i) => document.getElementById('fix-step-' + i));
+  const resultEl = document.getElementById('fix-result');
+  steps.forEach(s => { s.className = 'step-row'; });
+  resultEl.innerHTML = '';
+  ['fix-adopt', 'fix-copy', 'fix-regen'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+  // LUI 反馈：任务拆解步骤依次点亮，每步真实调用对应工具动作（agent 用工具取数）
+  for (let i = 0; i < steps.length; i++) {
+    steps[i].className = 'step-row doing';
+    let note = '';
+    const t = FIX_STEPS[i].tool;
+    if (t === 'getVuln') { const r = await AgentBridge.call('getVuln', { kind, id: v.id }); note = r.ok ? '已读取' : '读取失败'; }
+    else if (t === 'getVptAttribution') { const r = await AgentBridge.call('getVptAttribution', { kind, id: v.id }); note = r.ok ? (r.data.score + ' 分（' + r.data.key + '）· 特殊规则' + (r.data.byRule ? '命中' : '未命中')) : ''; }
+    else if (t === 'searchKnowledge') { const r = await AgentBridge.call('searchKnowledge', { kind, id: v.id }); note = r.ok ? '命中 ' + r.data.count + ' 条' : ''; }
+    else if (t === 'getAssetProfile') { const r = await AgentBridge.call('getAssetProfile', { kind, id: v.id }); note = r.ok ? (r.data.managed ? '已纳管' : '未纳管') : ''; }
+    await new Promise(r => setTimeout(r, regen ? 320 : 240));
+    steps[i].className = 'step-row done';
+    const nEl = steps[i].querySelector('.sp-note'); if (nEl) nEl.textContent = note;
+  }
+  const res = await AgentBridge.call('generateFixAdvice', { kind, id: v.id });
+  if (!res.ok) { resultEl.innerHTML = '<div class="unknown-note">生成失败：' + esc(res.error || '') + '</div>'; return; }
+  lastAdvice = res.data; lastAdviceVuln = v;
+  resultEl.innerHTML = renderAdviceHtml(res.data);
+  resultEl.querySelectorAll('.cite').forEach(c => c.addEventListener('click', () => toast('依据来源：' + c.title, 'success')));
+  ['fix-adopt', 'fix-copy', 'fix-regen'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+}
+function renderAdviceHtml(d) {
+  const cite = (text, title) => `<span class="cite" title="${esc(title)}">※ ${esc(text)}</span>`;
+  const assetRows = d.assets.map(a =>
+    `<div class="kv-line"><span class="k" style="width:150px">${esc(a.ip)}（${esc(a.name)}）：</span>
+     <span class="v">责任人 ${esc(a.owner)} · 所属 ${esc(a.org)} · 业务 ${esc(a.biz)} ${cite(a.from.split(' · ')[0], '数据来源：' + a.from)}</span></div>`).join('');
+  const builtinSteps = [
+    d.versionKnown
+      ? `确认受影响主机当前组件版本（平台软件台账收录：<b>${esc(d.versionText)}</b>${cite('软件台账', '数据来源：主机软件台账（资产IP精确匹配）')}），对照官方通告确认是否在受影响版本范围内。`
+      : `按官方建议升级相关组件至安全版本${cite('官方建议', '数据来源：漏洞详情 · 修复建议字段')}。（本环境资产版本信息缺失，无法给出精确版本对照，见下方说明）`,
+    `升级或变更前与业务负责人确认停机窗口；若无法立即升级，先采取临时缓解：收敛暴露面、关闭受影响端口、限制访问来源${cite('处置记录', '数据来源：漏洞详情 · 处置记录时间线')}。`,
+    `修复完成后发起复测，确认漏洞闭环${cite('状态流', '数据来源：平台漏洞处置状态定义（待处理→确认中→修复中→待复测→已修复）')}。`,
+  ];
+  // 远程模式下由后端 LLM 生成步骤（契约可选字段 steps）；本地模式用前端内置步骤
+  const steps = Array.isArray(d.steps) && d.steps.length ? d.steps.map(esc) : builtinSteps;
+  const closedNote = d.sameClosed.length
+    ? `<div class="advice-sec-body">平台已有 <b>${d.sameClosed.length}</b> 条同 CVE 漏洞处置完成（${d.sameClosed.slice(0, 3).map(x => esc(x.asset)).join('、')}），可参考其处置方式${cite('同源工单', '数据来源：同列表中状态=已修复的同 CVE 记录')}。</div>`
+    : '';
+  return `<div class="ai-result">
+    <div class="advice-section">
+      <div class="advice-sec-title"><span class="as-no">①</span> 受影响资产与责任人</div>
+      <div class="advice-sec-body">${assetRows}</div>
+      ${d.managed ? '' : `<div class="unknown-note">※ 平台资产台账中未收录该资产（未纳管）——以上责任人信息取自漏洞详情字段，建议先完成资产纳管再下发修复，否则无法追踪落实。</div>`}
+    </div>
+    <div class="advice-section">
+      <div class="advice-sec-title"><span class="as-no">②</span> 组件与版本现状</div>
+      ${d.versionKnown
+        ? `<div class="advice-sec-body">软件台账已收录该资产相关组件：${esc(d.versionText)}${cite('软件台账', '数据来源：主机软件台账')}。</div>`
+        : `<div class="unknown-note">平台无法判断该资产当前运行的组件与版本${d.managed ? '（已纳管但软件台账未采集）' : '（资产未纳管）'}——此处不做猜测，请通过资产扫描或人工确认后再执行版本对照。</div>`}
+      ${d.kbFound ? `<div class="advice-sec-body" style="margin-top:6px">知识库命中同源条目：${esc(d.kbText)}${cite('知识库', '数据来源：漏洞知识库（CVE 精确匹配）')}。</div>` : ''}
+    </div>
+    <div class="advice-section">
+      <div class="advice-sec-title"><span class="as-no">③</span> 建议执行步骤</div>
+      <div class="advice-sec-body"><ol>${steps.map(s => `<li>${s}</li>`).join('')}</ol></div>
+      ${closedNote}
+    </div>
+    <div class="advice-section">
+      <div class="advice-sec-title"><span class="as-no">④</span> 协调事项与影响评估</div>
+      <div class="advice-sec-body">
+        <div class="kv-line"><span class="k" style="width:120px">漏洞负责人：</span><span class="v">${esc(d.coord.owner)} / ${esc(d.coord.coOwner)}${cite('漏洞详情', '数据来源：漏洞详情 · 漏洞负责人字段')}</span></div>
+        <div class="kv-line"><span class="k" style="width:120px">业务系统：</span><span class="v">${esc(d.coord.biz)}${cite('漏洞详情', '数据来源：漏洞详情 · 业务系统字段')}</span></div>
+        <div class="kv-line"><span class="k" style="width:120px">建议时间窗：</span><span class="v">平台未采集停机窗口数据，无法自动判断；建议与资产责任人（${esc(d.coord.assetOwner)}）确认后，在创建工单时指定计划修复时间。</span></div>
+      </div>
+    </div>
+    <div class="conf-band">
+      <i class="conf-dot" style="background:${d.confLevel === 'high' ? '#52c41a' : '#faad14'}"></i>
+      置信度：<b>${esc(d.confidence)}</b>　|　生成依据 ${d.assets.length + steps.length + (d.kbFound ? 1 : 0)} 项平台数据，逐条可溯源；缺失 ${d.unknowns.length} 项，已标注「无法判断」。　|　生成方式：${d.generatedBy === 'deepseek' ? 'DeepSeek 真实分析' : d.generatedBy ? '后端模板（LLM 未配置）' : '前端本地模拟'}
+    </div>
+  </div>`;
+}
+function copyAdviceText() {
+  if (!lastAdvice || !lastAdviceVuln) return;
+  const d = lastAdvice;
+  const lines = [
+    '【修复建议助手 · 本地化建议】（测试版，AI 生成内容仅供参考）',
+    '漏洞：' + d.vuln.name + '（' + d.vuln.level + ' / ' + d.vuln.vpt + '）',
+    '受影响资产：' + d.assets.map(a => a.ip + '（' + a.name + '，责任人 ' + a.owner + '）').join('；'),
+    '组件版本：' + (d.versionKnown ? d.versionText : '平台无数据，无法判断'),
+    '建议步骤：1) 对照官方通告升级组件 2) 无法立即升级时先收敛暴露面等临时缓解 3) 修复后复测闭环',
+    '协调：负责人 ' + d.coord.owner + ' / ' + d.coord.coOwner + '，业务系统 ' + d.coord.biz,
+    '——所有结论均来自平台结构化数据，缺失数据已标注。',
+  ].join('\n');
+  try { navigator.clipboard.writeText(lines); } catch (e) {}
+  toast('已复制到剪贴板');
+}
+function confirmAdoptAdvice(kind, v) {
+  $modalRoot.innerHTML = `
+  <div class="modal-mask" id="ad-mask">
+    <div class="modal" style="width:440px">
+      <span class="modal-close" id="ad-close">×</span>
+      <div class="modal-title">确认采纳</div>
+      <div style="font-size:13px;line-height:1.9;color:rgba(0,0,0,.75)">
+        将依据「修复建议助手」生成的本地化建议，为漏洞 <b>${esc(v.name)}</b>（ID ${v.id}）创建修复工单。<br>
+        这是<b>改变系统状态</b>的动作：按分级放权原则需人工确认，并写入审计日志。
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="ad-cancel">取消</button>
+        <button class="btn btn-primary" id="ad-ok">确认采纳</button>
+      </div>
+    </div>
+  </div>`;
+  const close = () => { $modalRoot.innerHTML = ''; };
+  document.getElementById('ad-close').addEventListener('click', close);
+  document.getElementById('ad-cancel').addEventListener('click', close);
+  document.getElementById('ad-ok').addEventListener('click', async () => {
+    const r = await AgentBridge.call('adoptFixAdvice', { kind, id: v.id });
+    close();
+    if (r.ok) {
+      closeFixAssistant();
+      const tid = r.data && r.data.ticketId ? r.data.ticketId : '';
+      toast('已采纳并创建修复工单 ' + tid + '，可在 工单中心-全部工单 / 日志管理 查看');
+    } else toast(r.error || '采纳失败', 'error');
+  });
+}
+
+/* ================================================================
+ * 工单中心（全部工单 / 我的工单）：完整增删改查
+ * 本地模式操作内存数据；远程模式直接调用后端 /api/tickets
+ * 主键：工单号（第 7 列 ticketId）
+ * ================================================================ */
+const T_STATUS = ['进行中', '已结束', '已取消'];
+function ticketRowFromObj(t) {
+  return [
+    t.createdAt || '-',
+    ((t.vulnName || ('漏洞ID ' + (t.vulnId ?? '-'))) + (t.vulnId != null ? '（ID ' + t.vulnId + '）' : '')),
+    t.executor || 'tester',
+    t.step || '提交修复建议',
+    t.status || '进行中',
+    t.planTime || '-',
+    t.ticketId || '-',
+    '',
+  ];
+}
+function remoteApi(method, path, body) {
+  const cfg = AgentBridge.getConfig();
+  return fetch(cfg.baseUrl + path, {
+    method,
+    headers: Object.assign({ 'Content-Type': 'application/json' }, adminHeaders()),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).then(r => r.json());
+}
+async function loadTicketRows() {
+  if (AgentBridge.getConfig().mode === 'remote') {
+    const r = await remoteApi('GET', '/api/tickets');
+    if (!r.ok) throw new Error(r.error || '响应格式错误');
+    return (r.data || []).map(ticketRowFromObj);
+  }
+  return DB.tickets.slice();
+}
+async function renderOrders(page = 'orders', tab = 0) {
+  const isMine = page === 'mine';
+  let rows = [], loadErr = '';
+  try { rows = await loadTicketRows(); } catch (e) { loadErr = '远程拉取工单失败：' + e.message; }
+  const cols = isMine
+    ? ['工单名称', '执行人', '当前步骤', '工单状态', '计划完成时间', '操作']
+    : ['创建时间', '工单名称', '执行人', '当前步骤', '工单状态', '计划完成时间', '外部工单 ID', '操作'];
+  const tabs = isMine ? ['待处理', '我创建', '抄送我', '已处理'] : ['进行中', '已结束'];
+  const filtered = rows.filter(r => {
+    if (isMine) return tab === 0 ? r[4] === '进行中' : tab === 3 ? r[4] !== '进行中' : tab === 1;
+    return tab === 0 ? r[4] === '进行中' : r[4] !== '进行中';
+  });
+  const statusCls = s => s === '进行中' ? 'tag-status' : s === '已结束' ? 'tag-status-done' : 'tag-status-off';
+  const bodyHtml = loadErr ? `<div class="unknown-note">${esc(loadErr)}</div>` : filtered.length
+    ? `<table class="grid"><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+        ${filtered.map(r => `<tr>
+          ${isMine
+            ? `<td class="cell-link" data-op="view" data-id="${esc(r[6])}">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td><span class="tag ${statusCls(r[4])}">${esc(r[4])}</span></td><td>${esc(r[5])}</td>`
+            : `<td>${esc(r[0])}</td><td class="cell-link" data-op="view" data-id="${esc(r[6])}">${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td><span class="tag ${statusCls(r[4])}">${esc(r[4])}</span></td><td>${esc(r[5])}</td><td>${esc(r[6])}</td>`}
+          <td><span class="ops">
+            <button class="icon-btn" data-op="view" data-id="${esc(r[6])}" title="查看">${ICONS.eye}</button>
+            <button class="icon-btn" data-op="edit" data-id="${esc(r[6])}" title="编辑">${ICONS.edit}</button>
+            <button class="icon-btn danger" data-op="delete" data-id="${esc(r[6])}" title="删除">${ICONS.trash}</button>
+          </span></td>
+        </tr>`).join('')}
+      </tbody></table>`
+    : `<div class="empty"><svg width="48" height="40" viewBox="0 0 48 40"><path d="M6 14l8-8h20l8 8v18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V14z" fill="#f5f5f5" stroke="#d9d9d9"/><path d="M6 14h12c0 3 2.7 5 6 5s6-2 6-5h12" fill="none" stroke="#d9d9d9"/></svg><div>暂无数据</div></div>`;
+  $content.innerHTML = `
+  <div class="card">
+    ${isMine ? '' : `<div class="filter-bar"><div class="filter-item">工单名称: <input class="input"></div><div class="filter-item">创建时间: <input class="input" placeholder="开始日期"></div><span class="filter-more">···</span></div>`}
+    <div class="select-bar"><span>已选 <b>0</b> 条</span>
+      <svg width="11" height="11" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor"/></svg>
+      <div class="sb-right">${isMine ? '<a id="ord-create">批量新建</a>' : ''}<a id="ord-create">新 建</a><span style="color:#8c8c8c;display:inline-flex">${ICONS.refresh}</span></div>
+    </div>
+    <div class="mini-tabs">${tabs.map((t, i) => `<div class="mini-tab${i === tab ? ' active' : ''}" data-t="${i}">${esc(t)}</div>`).join('')}</div>
+    <div class="table-wrap" style="margin-top:6px">${bodyHtml}</div>
+    <div class="pagination"><span>共 ${filtered.length} 条</span><span class="pg-item">‹</span><span class="pg-item active">1</span><span class="pg-item">›</span></div>
+  </div>`;
+  $content.querySelectorAll('.mini-tab').forEach(t => t.addEventListener('click', () => renderOrders(page, Number(t.dataset.t))));
+  document.getElementById('ord-create').addEventListener('click', () => openTicketForm('create', null, page));
+  $content.querySelectorAll('[data-op]').forEach(el => el.addEventListener('click', () => {
+    const tid = el.dataset.id, op = el.dataset.op;
+    if (op === 'view') openTicketView(tid);
+    else if (op === 'edit') openTicketForm('edit', tid, page);
+    else if (op === 'delete') confirmDeleteTicket(tid, page);
+  }));
+}
+function findTicketRow(tid) {
+  return loadTicketRows().then(rows => rows.find(r => r[6] === tid) || null);
+}
+function openTicketView(tid) {
+  findTicketRow(tid).then(r => {
+    if (!r) { toast('工单不存在', 'error'); return; }
+    $modalRoot.innerHTML = `
+    <div class="modal-mask" id="tv-mask">
+      <div class="modal" style="width:520px">
+        <span class="modal-close" id="tv-close">×</span>
+        <div class="modal-title">工单详情 ${esc(tid)}</div>
+        <div class="field-grid" style="grid-template-columns:1fr 1fr;gap:10px 24px">
+          ${[['创建时间', r[0]], ['工单名称', r[1]], ['执行人', r[2]], ['当前步骤', r[3]], ['工单状态', r[4]], ['计划完成时间', r[5]], ['外部工单 ID', r[6]]].map(([k, v]) =>
+            `<div class="kv-line"><span class="k" style="width:88px">${esc(k)}：</span><span class="v">${esc(v)}</span></div>`).join('')}
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary" id="tv-close2">关闭</button></div>
+      </div>
+    </div>`;
+    ['tv-close', 'tv-close2'].forEach(id => document.getElementById(id).addEventListener('click', () => { $modalRoot.innerHTML = ''; }));
+    document.getElementById('tv-mask').addEventListener('click', e => { if (e.target.id === 'tv-mask') $modalRoot.innerHTML = ''; });
+  });
+}
+function openTicketForm(mode, tid, page) {
+  const fill = r => r || ['-', '', 'tester', '提交修复建议', '进行中', '-', '-', ''];
+  findTicketRow(tid).then(r0 => {
+    const r = fill(r0);
+    const editable = !(AgentBridge.getConfig().mode === 'remote') || true;
+    $modalRoot.innerHTML = `
+    <div class="modal-mask" id="tf-mask">
+      <div class="modal" style="width:560px">
+        <span class="modal-close" id="tf-close">×</span>
+        <div class="modal-title">${mode === 'create' ? '新建工单' : '编辑工单 ' + esc(tid)}</div>
+        <div class="form-grid" style="grid-template-columns:1fr;gap:12px">
+          <div class="form-item"><label>工单名称：</label><input class="input" id="tf-name" value="${esc(mode === 'create' ? '' : r[1])}" placeholder="请输入工单名称"></div>
+          <div class="form-item"><label>执行人：</label><input class="input" id="tf-exec" value="${esc(mode === 'create' ? 'tester' : r[2])}"></div>
+          <div class="form-item"><label>当前步骤：</label><input class="input" id="tf-step" value="${esc(mode === 'create' ? '提交修复建议' : r[3])}"></div>
+          <div class="form-item"><label>工单状态：</label><select class="select" id="tf-status">${T_STATUS.map(s => `<option${s === (mode === 'create' ? '进行中' : r[4]) ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+          <div class="form-item"><label>计划完成时间：</label><input class="input" id="tf-plan" value="${esc(mode === 'create' ? '' : r[5])}" placeholder="2026-10-31"></div>
+          ${mode === 'edit' ? `<div class="form-item disabled"><label>工单编号：</label><input class="input" value="${esc(tid)}" disabled></div>` : ''}
+        </div>
+        <div class="modal-footer"><button class="btn" id="tf-cancel">取消</button><button class="btn btn-primary" id="tf-save">保存</button></div>
+      </div>
+    </div>`;
+    const close = () => { $modalRoot.innerHTML = ''; };
+    ['tf-close', 'tf-cancel'].forEach(id => document.getElementById(id).addEventListener('click', close));
+    document.getElementById('tf-mask').addEventListener('click', e => { if (e.target.id === 'tf-mask') close(); });
+    document.getElementById('tf-save').addEventListener('click', async () => {
+      const name = document.getElementById('tf-name').value || '未命名工单';
+      const exec = document.getElementById('tf-exec').value || 'tester';
+      const step = document.getElementById('tf-step').value || '-';
+      const status = document.getElementById('tf-status').value;
+      const plan = document.getElementById('tf-plan').value || '-';
+      if (AgentBridge.getConfig().mode === 'remote') {
+        if (mode === 'create') {
+          const resp = await remoteApi('POST', '/api/tickets', { vulnName: name, executor: exec, step, status, planTime: plan, from: 'manual' });
+          if (!resp.ok) { toast(resp.error || '创建失败', 'error'); return; }
+        } else {
+          const resp = await remoteApi('PATCH', '/api/tickets/' + encodeURIComponent(tid), { vulnName: name, executor: exec, step, status, planTime: plan });
+          if (!resp.ok) { toast(resp.error || '保存失败', 'error'); return; }
+        }
+      } else {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+        if (mode === 'create') {
+          const newId = 'MOCK-' + Date.now().toString().slice(-6);
+          DB.tickets.unshift([ts, name, exec, step, status, plan, newId, '']);
+          DB.logs.unshift([ts, 'tester', 'leader', '127.0.0.1', '工单中心：手动新建工单（' + newId + '）', '成功']);
+        } else {
+          const i = DB.tickets.findIndex(x => x[6] === tid);
+          if (i > -1) DB.tickets[i] = [DB.tickets[i][0], name, exec, step, status, plan, tid, ''];
+          DB.logs.unshift([ts, 'tester', 'leader', '127.0.0.1', '工单中心：编辑工单（' + tid + '）', '成功']);
+        }
+      }
+      close();
+      toast(mode === 'create' ? '工单已创建' : '工单已保存');
+      renderOrders(page, 0);
+    });
+  });
+}
+function confirmDeleteTicket(tid, page) {
+  $modalRoot.innerHTML = `
+  <div class="modal-mask" id="td-mask">
+    <div class="modal" style="width:420px">
+      <span class="modal-close" id="td-close">×</span>
+      <div class="modal-title">删除工单</div>
+      <div style="font-size:13px;line-height:1.9;color:rgba(0,0,0,.75)">确认删除工单 <b>${esc(tid)}</b>？该操作会写入审计日志。</div>
+      <div class="modal-footer"><button class="btn" id="td-cancel">取消</button><button class="btn btn-primary" id="td-ok" style="background:#ff4d4f;border-color:#ff4d4f">删除</button></div>
+    </div>
+  </div>`;
+  const close = () => { $modalRoot.innerHTML = ''; };
+  ['td-close', 'td-cancel'].forEach(id => document.getElementById(id).addEventListener('click', close));
+  document.getElementById('td-ok').addEventListener('click', async () => {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    if (AgentBridge.getConfig().mode === 'remote') {
+      const resp = await remoteApi('DELETE', '/api/tickets/' + encodeURIComponent(tid));
+      if (!resp.ok) { toast(resp.error || '删除失败', 'error'); return; }
+    } else {
+      const i = DB.tickets.findIndex(x => x[6] === tid);
+      if (i > -1) DB.tickets.splice(i, 1);
+      DB.logs.unshift([ts, 'tester', 'leader', '127.0.0.1', '工单中心：删除工单（' + tid + '）', '成功']);
+    }
+    close();
+    toast('工单已删除');
+    renderOrders(page, 0);
+  });
+}
+
+/* ================================================================
+ * 九、通用列表页渲染器
+ * ================================================================ */
+const LIST_CONFIGS = {
+  ip: { title: '主机资产', key: 'assetsIp', tabs: ['全部 (131)', '已纳管 (50)', '未纳管 (77)', '已排除 (2)', '历史资产 (2)'],
+    filters: ['资产 IP', '资产名称', '资产负责人', '其他负责人'],
+    cols: ['资产 IP', '资产名称', '所属组织机构', '资产来源', '关联agent_id', '所属域', '资产风险', '资产负责人', '操作'], riskCol: 6, links: [0],
+    batchOps: ['纳管', '取消纳管', '排除', '下架'] },
+  web: { title: 'Web 资产', key: 'assetsWeb', tabs: ['全部 (4)', '已纳管 (4)', '未纳管 (0)', '已排除 (0)', '历史资产 (0)'],
+    filters: ['资产 URL', '资产名称', '资产负责人', '其他负责人'],
+    cols: ['资产 URL', '资产名称', '所属组织机构', '资产来源', '所属域', '资产风险', '资产负责人', '其他责任人', '操作'], riskCol: 5, links: [0],
+    batchOps: ['纳管', '取消纳管', '排除', '下架'] },
+  domain: { title: '主域名资产', key: 'assetsDomain', tabs: ['全部 (3)', '已纳管 (3)', '未纳管 (0)', '已排除 (0)', '历史资产 (0)'],
+    filters: ['主域名', '资产名称', '资产负责人', '其他负责人'],
+    cols: ['主域名', '资产名称', '所属组织机构', '资产来源', '所属域', '资产风险', '资产负责人', '其他责任人', '操作'], riskCol: 5, links: [0] },
+  subdomain: { title: '子域名资产', key: 'assetsSubdomain', tabs: ['全部 (2)', '已纳管 (2)', '未纳管 (0)', '已排除 (0)', '历史资产 (0)'],
+    filters: ['子域名', '资产负责人', '所属域', '所属组织机构'],
+    cols: ['子域名', '所属主域名', '所属组织机构', '资产来源', '所属域', '资产负责人', '其他责任人', '最近更新时间', '操作'], links: [0] },
+  api: { title: 'API资产', key: [], tabs: ['全部 (0)', '已纳管 (0)', '未纳管 (0)', '已排除 (0)', '历史资产 (0)'],
+    filters: ['请求方法', 'URL', 'PATH', '谓词'],
+    cols: ['请求方法', 'URL', 'Path', '谓词', '所属组织机构', '所属域', '资产负责人', '其他责任人', '资产来源', '资产风险', '操作'] },
+  certificate: { title: '证书资产', key: 'assetsCert', tabs: ['全部 (0)', '已纳管 (0)', '未纳管 (0)', '已排除 (0)', '历史资产 (0)'],
+    filters: ['证书哈希SHA-256', '资产负责人', '其他责任人'],
+    cols: ['通用记录(CN)', '证书哈希SHA-256', '组织(O)', '组织部门(OU)', '资产负责人', '其他责任人', '证书类型', '证书状态', '证书过期时间', '最近更新时间', '操作'] },
+  port: { title: '端口服务', key: 'portService', tabs: ['正常开放'],
+    filters: ['主机IP', '端口', '服务名称'],
+    cols: ['主机IP', '所属组织机构', '端口', '协议', '服务名称', '产品组件', '版本', '来源', '业务系统', '关联漏洞'], links: [0] },
+  fingerprint: { title: '网站指纹', key: 'fingerprint', tabs: ['正常开放'],
+    filters: ['产品名称', '关联域名'],
+    cols: ['产品名称', '所属组织机构', '产品分类', '关联域名', 'CPE', '网站', '来源', '关联漏洞', '业务系统'] },
+  software: { title: '主机软件', key: 'software', tabs: [],
+    filters: ['软件名称', '资产IP'],
+    cols: ['软件名称', '版本', '资产名称', '资产IP', '所属组织机构', '软件负责人', '软件路径', '关联agent_id', '更新时间', '资产来源'] },
+  assetTags: { title: '资产标签', key: 'assetTags', tabs: [],
+    filters: ['标签名称', '更新人', '是否启用', '标签描述'],
+    cols: ['标签名称', '是否启用', '更新人', '标签描述', '最近更新时间', '操作'], tagCol: 0,
+    actions: ['eye', 'edit', 'trash'] },
+  business: { title: '业务系统', key: 'business', tabs: [],
+    filters: ['业务系统简称', '业务系统全称', '业务负责人'],
+    cols: ['业务系统简称', '业务系统全称', '关联资产数', '外网资产', '是否外网', '所属组织机构', '系统风险', '业务负责人', '漏洞数量', '系统重要性', '操作'], riskCol: 6 },
+  vulTags: { title: '漏洞标签', key: 'vulTags', tabs: [], filters: ['标签名称'],
+    cols: ['标签名称', '创建时间', '操作'], tagCol: 0, actions: ['trash'] },
+  knowledge: { title: '漏洞知识库', key: 'knowledge', tabs: [],
+    filters: ['漏洞名称', '漏洞等级', '漏洞类型', '漏洞编号'],
+    cols: ['漏洞名称', '漏洞等级', '漏洞类型', 'CVE 编号', 'CVSS3', '知识库标签', '公开时间', '操作'], levelCol: 1, links: [0],
+    actions: ['eye', 'edit'] },
+  intel: { title: '漏洞情报库', key: 'intel', tabs: [],
+    filters: ['漏洞名称', '漏洞等级', '漏洞类型', '漏洞编号'],
+    cols: ['漏洞名称', '漏洞等级', 'CVE 编号', '漏洞类型', '情报来源', '自定义标签', '公开时间', '情报更新时间', '平台更新时间', '操作'], levelCol: 1, links: [0],
+    actions: ['eye', 'edit', 'trash'] },
+  exposure: { title: '风险排查', key: 'exposureTasks', tabs: [],
+    filters: ['任务名称', '状态', '创建时间'],
+    cols: ['任务名称', '状态', '匹配漏洞数', '创建人', '任务创建时间', '任务结束时间', '描述', '操作'],
+    actions: ['eye', 'trash'] },
+  baseline: { title: '基线风险', key: 'baselines', tabs: [],
+    filters: ['主机IP', '主机名'],
+    cols: ['主机IP', '主机名', '检查项总数', '不合格项', '风险项', '操作'] },
+  tasks: { title: '任务列表', key: 'tasks', tabs: ['扫描检测任务（2）', '数据同步任务（7）'],
+    filters: ['任务名称', '状态', '创建时间'],
+    cols: ['任务名称', '任务来源', '创建人', '所属组织机构', '所属域', '计划类型', '计划是否启用', '任务状态', '最近执行时间', '创建时间', '操作'] },
+  scanDevices: { title: '接入列表', key: 'scanDevices', tabs: [],
+    filters: ['设备名称', '设备管理人'],
+    cols: ['设备名称', '来源', '设备管理人', '所属组织机构', '所属域', '设备状态', '最近执行时间', '访问地址', '操作'] },
+  images: { title: '镜像管理', key: 'images', tabs: [],
+    filters: ['名称'],
+    cols: ['名称', '版本', '标签', '创建时间'], actions: [] },
+  orders: { title: '全部工单', key: 'tickets', tabs: ['进行中', '已结束'],
+    filters: ['工单名称', '创建时间'],
+    cols: ['创建时间', '工单名称', '执行人', '当前步骤', '工单状态', '计划完成时间', '外部工单 ID', '操作'] },
+  mine: { title: '我的工单', key: [], tabs: ['待处理 (0)', '我创建 (4)', '抄送我 (0)', '已处理 (1)'],
+    filters: ['工单名称', '计划完成时间'],
+    cols: ['工单名称', '执行人', '当前步骤', '工单状态', '计划完成时间', '操作'] },
+  reportDownloads: { title: '报告下载', key: 'reportDownloads', tabs: [],
+    filters: [],
+    cols: ['报告名称', '格式', '状态', '创建人', '创建时间', '操作'] },
+  reportFiles: { title: '报告资料', key: 'reportFiles', tabs: [],
+    filters: ['报告名称'],
+    cols: ['报告名称', '报告类型', '报告版本', '上交单位', '创建人', '创建时间', '操作'] },
+  datafields: { title: '数据管理', key: 'datafields', tabs: ['域管理', '主机资产', 'Web 资产', '域名资产', 'IP 漏洞', 'Web 漏洞'],
+    filters: ['名称'],
+    cols: ['名称', '组织机构', '是否启用', '描述', '创建时间', '操作'] },
+  logs: { title: '日志管理', key: 'logs', tabs: [],
+    filters: ['用户名'],
+    cols: ['操作时间', '用户名', '角色', 'IP地址', '操作日志描述', '操作结果'] },
+  docker: { title: '容器监控', key: 'docker', tabs: ['容器', '镜像'],
+    filters: ['名字'],
+    cols: ['名字', '镜像', '状态', 'IP 地址', '端口', '操作'] },
+};
+
+function renderListPage(cfgKey) {
+  const cfg = LIST_CONFIGS[cfgKey];
+  if (!cfg) { renderSimplePage('页面', ''); return; }
+  const data = cfg.key ? DB[cfg.key] : [];
+  const hasData = data && data.length;
+  const rowsHtml = hasData ? data.map(r => {
+    const cells = cfg.cols.map((c, i) => {
+      if (c === '操作') {
+        const acts = cfg.actions || ['eye', 'edit', 'trash'];
+        return `<td><span class="ops">${acts.map(a => `<button class="icon-btn${a === 'trash' ? ' danger' : ''}" data-act="${a}" title="${a}">${ICONS[a]}</button>`).join('')}</span></td>`;
+      }
+      const val = r[i] ?? '';
+      if (cfg.riskCol === i) return `<td>${riskTag(val)}</td>`;
+      if (cfg.levelCol === i) return `<td>${levelTag(val)}</td>`;
+      if (cfg.tagCol === i) return `<td><span class="chip">${esc(val)}</span></td>`;
+      const cls = (cfg.links || []).includes(i) ? ' class="cell-link"' : '';
+      return `<td${cls}>${esc(val)}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('') : `<tr><td colspan="${cfg.cols.length}"><div class="empty">
+    <svg width="48" height="40" viewBox="0 0 48 40"><path d="M6 14l8-8h20l8 8v18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V14z" fill="#f5f5f5" stroke="#d9d9d9"/><path d="M6 14h12c0 3 2.7 5 6 5s6-2 6-5h12" fill="none" stroke="#d9d9d9"/></svg>
+    <div>暂无数据</div></div></td></tr>`;
+
+  $content.innerHTML = `
+  <div class="card">
+    ${cfg.filters.length ? `<div class="filter-bar">${cfg.filters.map(f => `<div class="filter-item">${esc(f)}: <input class="input"></div>`).join('')}<span class="filter-more">···</span></div>` : ''}
+    <div class="select-bar"><span>已选 <b>0</b> 条</span>
+      <svg width="11" height="11" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor"/></svg>
+      <div class="sb-right">
+        ${cfgKey === 'vulTags' ? '<a class="disabled">批量删除</a><a>新建</a><a>批量导入</a>' :
+          cfgKey === 'assetTags' ? '<a class="disabled">批量删除</a><a>新建</a><a>批量导入</a>' :
+          cfgKey === 'knowledge' ? '<a>批量添加标签</a><a>复制到情报库</a><a>风险排查</a>' :
+          cfgKey === 'intel' ? '<a>新建</a><a>批量导入</a><a>风险排查</a><a>批量添加标签</a>' :
+          cfgKey === 'orders' || cfgKey === 'mine' ? '<a>批量操作</a><a>新建</a>' :
+          '<a>批量操作</a><a>下载</a>'}
+        <span style="color:#8c8c8c;display:inline-flex">${ICONS.refresh}</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr>${cfg.cols.map(c => `<th>${esc(c)}${['漏洞等级', '创建时间', '最近更新时间'].includes(c) ? '<span class="sort-arrows">▲<br>▼</span>' : ''}</th>`).join('')}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <div class="pagination"><span>共 ${hasData ? data.length : 0} 条</span><span class="pg-item">‹</span><span class="pg-item active">1</span><span class="pg-item">›</span><select class="select" style="width:96px"><option>20 条/页</option></select> 跳至 <input class="input pg-jump"> 页</div>
+  </div>`;
+}
+
+/* ================================================================
+ * 十、VPT 配置页（漏洞等级评定核心）
+ * ================================================================ */
+async function renderVptPage(tab = 'std') {
+  const res = await AgentBridge.call('getVptConfig');
+  const c = res.data;
+  const editMode = window.__vptEdit === true;
+  const pct = (label, val, dis) => `<div class="score-row"><span class="sr-label"><i class="req">${dis ? '' : '*'}</i>${label}</span>
+    <input class="input pct-input" value="${val}" ${dis ? 'disabled' : ''}> <span class="sr-sub">%</span></div>`;
+  const condRow = (cond, dis) => `<div class="rule-cond-row">
+    <select class="select" ${dis ? 'disabled' : ''}><option>${esc(cond[0])}</option></select>
+    <select class="select op" ${dis ? 'disabled' : ''}><option>${esc(cond[1])}</option></select>
+    <select class="select" ${dis ? 'disabled' : ''}><option>${esc(cond[2])}</option></select>
+    <button class="rc-trash" title="删除条件">🗑</button></div>`;
+  const vptRangeRows = VPT_RANGE.map(x =>
+    `<div class="score-row"><span class="sr-label" style="color:${x.cls === 'vpt-p0' ? '#ff4d4f' : x.cls === 'vpt-p1' ? '#fa8c16' : x.cls === 'vpt-p2' ? '#d4b106' : 'inherit'};font-weight:700">${x.key}</span>
+     <span>：${esc(x.label)}</span></div>`).join('');
+  $content.innerHTML = `
+  <div class="card">
+    <div class="state-tabs">
+      <div class="state-tab${tab === 'std' ? ' active' : ''}" id="vpt-tab-std">标准规则</div>
+      <div class="state-tab${tab === 'map' ? ' active' : ''}" id="vpt-tab-map">等级映射与排序</div>
+      <span class="st-spacer"></span>
+      <div class="st-actions"><a id="vpt-edit">编辑</a><a id="vpt-reset" style="color:#ff4d4f">重置</a></div>
+    </div>
+    ${tab === 'std' ? `
+    <div class="vpt-layout" style="margin-top:14px">
+      <div>
+        <div class="vpt-section-title" style="margin-top:0">属性占比</div>
+        ${pct('资产属性(占比)', c.weights.asset, true)}
+        ${pct('漏洞属性(占比)', c.weights.vuln, true)}
+        ${pct('情报属性(占比)', c.weights.intel, true)}
+        <div class="vpt-section-title">资产属性</div>
+        ${pct('是否外网资产', c.assetProps.internet.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">是</span><input class="input mini-input" value="${c.assetProps.internet.vals['是']}" disabled>
+          <span class="sr-sub">否</span><input class="input mini-input" value="${c.assetProps.internet.vals['否']}" disabled></div>
+        ${pct('资产重要性', c.assetProps.importance.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">核心资产</span><input class="input mini-input" value="${c.assetProps.importance.vals['核心资产']}" disabled>
+          <span class="sr-sub">重要资产</span><input class="input mini-input" value="${c.assetProps.importance.vals['重要资产']}" disabled>
+          <span class="sr-sub">一般资产</span><input class="input mini-input" value="${c.assetProps.importance.vals['一般资产']}" disabled></div>
+        ${pct('资产标签', c.assetProps.tags.weight, true)}
+        <div class="score-row"><span class="sr-label"></span><span class="sr-sub">标签默认分值</span><input class="input mini-input" value="${c.assetProps.tags.defaultVal}" disabled></div>
+        <div class="vpt-section-title">漏洞属性</div>
+        ${pct('漏洞等级', c.vulnProps.level.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">超危</span><input class="input mini-input" value="${c.vulnProps.level.vals['超危']}" disabled>
+          <span class="sr-sub">高危</span><input class="input mini-input" value="${c.vulnProps.level.vals['高危']}" disabled>
+          <span class="sr-sub">中危</span><input class="input mini-input" value="${c.vulnProps.level.vals['中危']}" disabled>
+          <span class="sr-sub">低危</span><input class="input mini-input" value="${c.vulnProps.level.vals['低危']}" disabled>
+          <span class="sr-sub">默认</span><input class="input mini-input" value="${c.vulnProps.level.vals['默认']}" disabled></div>
+        ${pct('漏洞类型', c.vulnProps.type.weight, true)}
+        <div class="score-row"><span class="sr-label"></span><span class="sr-sub">漏洞类型默认分值</span><input class="input mini-input" value="${c.vulnProps.type.defaultVal}" disabled></div>
+        ${pct('漏洞标签', c.vulnProps.tags.weight, true)}
+        ${pct('知识库标签', c.vulnProps.kbTags.weight, true)}
+        <div class="score-row"><span class="sr-label"></span><span class="sr-sub">标签默认分值</span><input class="input mini-input" value="${c.vulnProps.kbTags.defaultVal}" disabled></div>
+        ${pct('自定义标签', c.vulnProps.customTags.weight, true)}
+        <div class="score-row"><span class="sr-label"></span><span class="sr-sub">自定义标签默认分值</span><input class="input mini-input" value="${c.vulnProps.customTags.defaultVal}" disabled></div>
+        <div class="vpt-section-title">情报属性</div>
+        ${pct('有无 EXP', c.intelProps.exp.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">有</span><input class="input mini-input" value="${c.intelProps.exp.vals['有']}" disabled>
+          <span class="sr-sub">无</span><input class="input mini-input" value="${c.intelProps.exp.vals['无']}" disabled></div>
+        ${pct('补丁发布', c.intelProps.patch.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">有</span><input class="input mini-input" value="${c.intelProps.patch.vals['有']}" disabled>
+          <span class="sr-sub">无</span><input class="input mini-input" value="${c.intelProps.patch.vals['无']}" disabled></div>
+        ${pct('在野利用', c.intelProps.wild.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">有</span><input class="input mini-input" value="${c.intelProps.wild.vals['有']}" disabled>
+          <span class="sr-sub">无</span><input class="input mini-input" value="${c.intelProps.wild.vals['无']}" disabled></div>
+        ${pct('利用方式', c.intelProps.exploitWay.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">远程利用</span><input class="input mini-input" value="${c.intelProps.exploitWay.vals['远程利用']}" disabled>
+          <span class="sr-sub">内网利用</span><input class="input mini-input" value="${c.intelProps.exploitWay.vals['内网利用']}" disabled>
+          <span class="sr-sub">本地利用</span><input class="input mini-input" value="${c.intelProps.exploitWay.vals['本地利用']}" disabled>
+          <span class="sr-sub">物理利用</span><input class="input mini-input" value="${c.intelProps.exploitWay.vals['物理利用']}" disabled></div>
+        ${pct('利用复杂度', c.intelProps.complexity.weight, true)}
+        <div class="score-row"><span class="sr-label"></span>
+          <span class="sr-sub">简单</span><input class="input mini-input" value="${c.intelProps.complexity.vals['简单']}" disabled>
+          <span class="sr-sub">中等</span><input class="input mini-input" value="${c.intelProps.complexity.vals['中等']}" disabled>
+          <span class="sr-sub">复杂</span><input class="input mini-input" value="${c.intelProps.complexity.vals['复杂']}" disabled></div>
+        <div class="vpt-section-title">特殊评分规则</div>
+        <div class="score-row"><span class="sr-label">启用规则：</span><span class="switch on" id="vpt-rule-switch"></span><a class="hyper" style="margin-left:8px">新增规则</a></div>
+        ${c.specialRules.map((r, i) => `<div class="rule-card">
+          <div class="rc-head">规则${i + 1}<span class="rc-del">删除规则</span></div>
+          <div class="score-row"><span class="sr-label"><i class="req">*</i>VPT 分数：</span><input class="input mini-input" value="${r.score}" disabled></div>
+          ${r.conds.map(cd => condRow(cd, true)).join('')}
+        </div>`).join('')}
+      </div>
+      <div class="vpt-note">
+        <h4>一、功能配置说明</h4>
+        <h4 style="font-weight:600">计分规则配置</h4>
+        <p>在系统中，您可自定义配置以下三类属性的权重分值，用于计算VPT综合评分：</p>
+        <ul>
+          <li>资产属性：如是否外网资产、资产重要性等。</li>
+          <li>漏洞属性：如漏洞严重等级、漏洞类型等。</li>
+          <li>情报属性：如有无EXP、有无补丁发布等。</li>
+        </ul>
+        <p>每项属性可设置具体分值及对应权重，系统将根据权重进行加权计算。</p>
+        <h4 style="font-weight:600">特殊评分规则配置</h4>
+        <p>支持通过条件匹配方式，为特定漏洞设定直接赋值的VPT分值。</p>
+        <div class="indent-quote">示例：若漏洞等级为“高危”且资产为“互联网暴露面”，则直接赋VPT分值为100。此类规则优先级高于常规计分规则，满足条件即命中，确保外网资产的高风险漏洞被快速识别。</div>
+        <h4 style="font-weight:600">VPT等级配置</h4>
+        <p>系统支持自定义VPT风险等级映射规则，通过设置不同分值区间，将漏洞自动归类至对应的P等级（P0～P4）。可根据实际业务风险偏好配置。</p>
+        <h4 style="font-weight:600">加权排序规则配置</h4>
+        <p>支持按资产重要性、情报维度等条件为漏洞附加排序权重，命中规则的漏洞将在列表中优先展示。</p>
+      </div>
+    </div>` : `
+    <div class="vpt-layout" style="margin-top:14px">
+      <div>
+        <div class="row-flex" style="margin-bottom:12px">
+          <div class="vpt-section-title" style="margin:0">VPT等级配置</div>
+          <div class="spacer"></div><a class="hyper" id="vpt-restore">恢复VPT默认优先级</a>
+        </div>
+        ${vptRangeRows}
+        <div class="vpt-section-title">加权排序规则</div>
+        <div class="score-row"><span class="sr-label">启用规则：</span><span class="switch on"></span><a class="hyper" style="margin-left:8px">新增规则</a></div>
+        ${c.sortRules.map((r, i) => `<div class="rule-card">
+          <div class="rc-head">规则${i + 1}<span class="rc-del">删除规则</span></div>
+          <div class="score-row"><span class="sr-label"><i class="req">*</i>加权分数：</span><input class="input mini-input" value="${r.score}" disabled></div>
+          ${r.conds.map(cd => condRow(cd, true)).join('')}
+        </div>`).join('')}
+      </div>
+      <div class="vpt-note">
+        <h4>二、VPT 等级说明</h4>
+        <div class="score-row"><b style="color:#ff4d4f">P0</b>：超危风险</div><div class="text-secondary" style="margin:-8px 0 8px">${esc(VPT_LEVEL_DESC.P0.desc)}</div>
+        <div class="score-row"><b style="color:#fa8c16">P1</b>：高危风险</div><div class="text-secondary" style="margin:-8px 0 8px">${esc(VPT_LEVEL_DESC.P1.desc)}</div>
+        <div class="score-row"><b style="color:#d4b106">P2</b>：中危风险</div><div class="text-secondary" style="margin:-8px 0 8px">${esc(VPT_LEVEL_DESC.P2.desc)}</div>
+        <div class="score-row"><b style="color:#1890ff">P3</b>：低危风险</div><div class="text-secondary" style="margin:-8px 0 8px">${esc(VPT_LEVEL_DESC.P3.desc)}</div>
+        <div class="score-row"><b style="color:#8c8c8c">P4</b>：信息风险</div><div class="text-secondary" style="margin:-8px 0 8px">${esc(VPT_LEVEL_DESC.P4.desc)}</div>
+      </div>
+    </div>`}
+  </div>`;
+  document.getElementById('vpt-tab-std').addEventListener('click', () => renderVptPage('std'));
+  document.getElementById('vpt-tab-map').addEventListener('click', () => renderVptPage('map'));
+  document.getElementById('vpt-edit').addEventListener('click', () => {
+    window.__vptEdit = !window.__vptEdit;
+    if (window.__vptEdit) toast('编辑模式（演示：所有输入框可编辑，保存走 AgentBridge）');
+    renderVptPage(tab);
+  });
+  document.getElementById('vpt-reset').addEventListener('click', () => { toast('已恢复默认 VPT 配置（演示）'); });
+  const restore = document.getElementById('vpt-restore');
+  if (restore) restore.addEventListener('click', () => toast('已恢复 VPT 默认优先级（演示）'));
+}
+
+/* ================================================================
+ * 启动
+ * ================================================================ */
+renderMenu('#/dashboard');
+router();
+// 远程模式下，采纳/建工单成功后把工单镜像进前端工单中心（本地模式由 LocalActions._recordTicket 直接写入，此处按模式判重）
+function _mirrorTicket(payload, result) {
+  if (AgentBridge.getConfig().mode !== 'remote' || !result || !result.ok) return;
+  const id = payload.id ?? payload.vulnId;
+  const kind = payload.kind || 'ip';
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  const list = kind === 'ip' ? DB.vulnsIp : DB.vulnsWeb;
+  const v = list.find(x => String(x.id) === String(id));
+  DB.tickets.unshift([ts, (v ? v.name : '漏洞ID ' + id) + '（ID ' + id + '）', 'tester', '提交修复建议', '进行中', v && v.planFix ? String(v.planFix).slice(0, 10) : '-', (result.data && result.data.ticketId) || '-', '']);
+}
+AgentBridge.on('after:adoptFixAdvice', ({ payload, result }) => _mirrorTicket(payload, result));
+AgentBridge.on('after:createTicket', ({ payload, result }) => _mirrorTicket(payload, result));
+</script>
+</body>
+</html>
